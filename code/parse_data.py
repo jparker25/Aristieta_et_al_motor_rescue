@@ -120,10 +120,10 @@ def get_dd_baseline_data(length, *paths):
 
 
 def save_naive_baseline_spikes(spikes):
-    run_cmd("mkdir -p data/training/naive_neurons/spikes")
+    run_cmd("mkdir -p ../data/training/naive_neurons/spikes")
     for i in range(len(spikes)):
         np.savetxt(
-            f"data/training/naive_neurons/spikes/cell_{i:04d}_baseline_spikes.txt",
+            f"../data/training/naive_neurons/spikes/cell_{i:04d}_baseline_spikes.txt",
             spikes[i],
             fmt="%f",
             newline="\n",
@@ -132,10 +132,10 @@ def save_naive_baseline_spikes(spikes):
 
 
 def save_dd_baseline_spikes(spikes):
-    run_cmd("mkdir -p data/training/dd_neurons/spikes")
+    run_cmd("mkdir -p ../data/training/dd_neurons/spikes")
     for i in range(len(spikes)):
         np.savetxt(
-            f"data/training/dd_neurons/spikes/cell_{i:04d}_baseline_spikes.txt",
+            f"../data/training/dd_neurons/spikes/cell_{i:04d}_baseline_spikes.txt",
             spikes[i],
             fmt="%f",
             newline="\n",
@@ -366,7 +366,7 @@ def get_ephys_data(source_path, save_path, fixed_length):
 
 
 def create_ephys_training_data(fixed_length):
-    save_dir = "data/training"
+    save_dir = "../data/training"
 
     get_ephys_data(jaws_path, f"{save_dir}/jaws_neurons", fixed_length)
     get_ephys_data(npas_path, f"{save_dir}/npas_neurons", fixed_length)
@@ -377,7 +377,7 @@ def create_ephys_training_data(fixed_length):
 
 
 def create_pulse_cont_training_data(fixed_length):
-    save_dir = "data/training"
+    save_dir = "../data/training"
     run_cmd(f"mkdir -p {save_dir}")
     run_cmd(f"mkdir -p {save_dir}/naive_neurons")
     run_cmd(f"mkdir -p {save_dir}/dd_neurons")
@@ -448,30 +448,33 @@ def create_pulse_cont_training_data(fixed_length):
     save_dd_baseline_spikes(dd_baseline_spikes)
     save_naive_baseline_spikes(naive_baseline_spikes)
     save_stat(
-        naive_baseline_lengths, "data/training/naive_neurons/cell_baseline_lengths.txt"
+        naive_baseline_lengths,
+        "../data/training/naive_neurons/cell_baseline_lengths.txt",
     )
-    save_stat(dd_baseline_lengths, "data/training/dd_neurons/cell_baseline_lengths.txt")
-    save_stat(naive_frs, "data/training/naive_neurons/cell_baseline_frs.txt")
-    save_stat(dd_frs, "data/training/dd_neurons/cell_baseline_frs.txt")
-    save_stat(naive_cvs, "data/training/naive_neurons/cell_baseline_cvs.txt")
-    save_stat(dd_cvs, "data/training/dd_neurons/cell_baseline_cvs.txt")
+    save_stat(
+        dd_baseline_lengths, "../data/training/dd_neurons/cell_baseline_lengths.txt"
+    )
+    save_stat(naive_frs, "../data/training/naive_neurons/cell_baseline_frs.txt")
+    save_stat(dd_frs, "../data/training/dd_neurons/cell_baseline_frs.txt")
+    save_stat(naive_cvs, "../data/training/naive_neurons/cell_baseline_cvs.txt")
+    save_stat(dd_cvs, "../data/training/dd_neurons/cell_baseline_cvs.txt")
 
     save_stat(
         naive_burst_statistics,
-        "data/training/naive_neurons/cell_baseline_burst_statistics.txt",
+        "../data/training/naive_neurons/cell_baseline_burst_statistics.txt",
     )
     save_stat(
         dd_burst_statistics,
-        "data/training/dd_neurons/cell_baseline_burst_statistics.txt",
+        "../data/training/dd_neurons/cell_baseline_burst_statistics.txt",
     )
 
-    save_meta_list(naive_name, "data/training/naive_neurons/cell_names.txt")
-    save_meta_list(naive_folder, "data/training/naive_neurons/cell_folders.txt")
-    save_meta_list(naive_mouse, "data/training/naive_neurons/cell_mouse.txt")
+    save_meta_list(naive_name, "../data/training/naive_neurons/cell_names.txt")
+    save_meta_list(naive_folder, "../data/training/naive_neurons/cell_folders.txt")
+    save_meta_list(naive_mouse, "../data/training/naive_neurons/cell_mouse.txt")
 
-    save_meta_list(dd_name, "data/training/dd_neurons/cell_names.txt")
-    save_meta_list(dd_folder, "data/training/dd_neurons/cell_folders.txt")
-    save_meta_list(dd_mouse, "data/training/dd_neurons/cell_mouse.txt")
+    save_meta_list(dd_name, "../data/training/dd_neurons/cell_names.txt")
+    save_meta_list(dd_folder, "../data/training/dd_neurons/cell_folders.txt")
+    save_meta_list(dd_mouse, "../data/training/dd_neurons/cell_mouse.txt")
 
     run_cmd(
         f"/Applications/MATLAB_R2021b.app/bin/matlab -nojvm -nodesktop -batch 'get_osc_data_pulse_cont'"
