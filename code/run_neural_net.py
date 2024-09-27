@@ -141,78 +141,7 @@ def run_grid_search(
     accuracy_test = accuracy_score(y_test, clf_final.predict(X_test_norm))
     print(accuracy_train, accuracy_test)
 
-    """
-    means = clf.cv_results_["mean_test_score"]
-    stds = clf.cv_results_["std_test_score"]
-    for mean, std, params in zip(means, stds, clf.cv_results_["params"]):
-        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
-    """
-
     return clf.best_params_
-
-    clf_final = MLPClassifier(
-        hidden_layer_sizes=clf.best_params_["hidden_layer_sizes"],
-        activation=clf.best_params_["activation"],
-        solver=clf.best_params_["solver"],
-        learning_rate=clf.best_params_["learning_rate"],
-        random_state=1,
-        max_iter=30000,
-        alpha=1e-5,
-        max_fun=30000,
-    )
-    clf_final.fit(X_train_norm, y_train)
-    accuracy_train = accuracy_score(y_train, clf.predict(X_train_norm))
-    accuracy_test = accuracy_score(y_test, clf.predict(X_test_norm))
-    print(accuracy_train, accuracy_test)
-    sys.exit()
-
-    fig, ax = plt.subplots(1, 2, figsize=(8, 4), dpi=300, tight_layout=True)
-    axes = [ax[i] for i in range(2)]
-
-    accuracy_train = accuracy_score(y_train, clf.predict(X_train))
-    accuracy_test = accuracy_score(y_test, clf.predict(X_test))
-
-    cm = confusion_matrix(y_train, clf.predict(X_train), labels=clf.classes_)
-    cm = cm / cm.sum()
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=clf.classes_)
-    precision, recall, _, _ = precision_recall_fscore_support(
-        y_train, clf.predict(X_train)
-    )
-
-    disp.plot(ax=axes[0], im_kw={"aspect": "auto"})
-    axes[0].set_title(
-        f"Accuracy: {accuracy_train:.02f}\nPrecision: {precision[1]:.02f}, {precision[0]:.02f}\nRecall: {recall[1]:.02f}, {recall[0]:.02f}",
-        fontsize=10,
-    )
-
-    cm = confusion_matrix(y_test, clf.predict(X_test), labels=clf.classes_)
-    cm = cm / cm.sum()
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=clf.classes_)
-    precision, recall, _, _ = precision_recall_fscore_support(
-        y_test, clf.predict(X_test)
-    )
-
-    disp.plot(ax=axes[1], im_kw={"aspect": "auto"})
-    axes[1].set_title(
-        f"Accuracy: {accuracy_test:.02f}\nPrecision: {precision[1]:.02f}, {precision[0]:.02f}\nRecall: {recall[1]:.02f}, {recall[0]:.02f}",
-        fontsize=10,
-    )
-
-    for i in range(2):
-        axes[i].set_xticks([0, 1])
-        axes[i].set_xticklabels(["DD", "Naive"])
-        axes[i].set_yticks([0, 1])
-        axes[i].set_yticklabels(["DD", "Naive"])
-
-    plt.suptitle(
-        f"Naive/DD Train: {len(y_train[y_train==1])}/{len(y_train[y_train==0])}, Naive/DD Test: {len(y_test[y_test==1])}/{len(y_test[y_test==0])}"
-    )
-
-    fig.savefig(f"../data/neural_net/grid_search_conf_mat.pdf", bbox_inches="tight")
-    plt.close()
-    if show:
-        run_cmd("open ../data/neural_net/grid_search_conf_mat.pdf")
-    return [accuracy_train, accuracy_test]
 
 
 def feature_importance(
@@ -627,142 +556,722 @@ def feature_importance_selected(
         run_cmd("open ../data/neural_net/feature_removal_performance_selected.pdf")
 
 
-def feature_removal_probabilities(
-    target_df, feature_array, train_amount, seeds=[0, 1, 2, 3, 4], show=False
+def predict_motor_rescue(
+    target_df,
+    feature_array,
+    outlier_dict,
+    jaws_npas_pre_post,
+    time_chunks=[[0], [30], [60], [90, 120], [150, 180, 210]],
+    train_amount=0.8,
+    seeds=np.arange(5),
+    show=False,
 ):
-    feature_df = target_df.iloc[:, feature_array]
-    features = feature_df.columns
+    target_df_outliers_removed = clean_data.remove_outliers_by_group_zscore_independent(
+        target_df[target_df["Type"] == 1],
+        target_df[target_df["Type"] == 0],
+        outlier_dict,
+    )
+    feature_df = target_df_outliers_removed.iloc[:, feature_array]
+    jaws_npas_pre_post_dropped = [
+        x.drop(columns=["mouse", "folder", "name", "Post-Time", "Medial"])
+        for x in jaws_npas_pre_post
+    ]
 
-    fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
-    axes = [ax[i, j] for i in range(4) for j in range(3)]
+    jaws_npas_pre_post_predicts = [
+        np.zeros((len(seeds), 4)) for x in jaws_npas_pre_post
+    ]  # jaws predicted dd, jaws predicted naive, npas predicted dd, npas predicted naive
 
-    fig2, ax2 = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
-    axes2 = [ax2[i, j] for i in range(4) for j in range(3)]
+    jaws_npas_pre_post_predicts_medial = [
+        np.zeros((len(seeds), 4)) for x in jaws_npas_pre_post
+    ]  # jaws predicted dd, jaws predicted naive, npas predicted dd, npas predicted naive
 
-    axis_plot = 0
-    for feature in features:
-        naive_data = []
-        naive_data_removed = []
-        dd_data = []
-        dd_data_removed = []
+    jaws_npas_pre_post_predicts_non_medial = [
+        np.zeros((len(seeds), 4)) for x in jaws_npas_pre_post
+    ]  # jaws predicted dd, jaws predicted naive, npas predicted dd, npas predicted naive
 
-        for seed in seeds:
-            np.random.seed(seed)
-            X_train, X_test, y_train, y_test = clean_data.split_data(
-                feature_df, target_df, train_amount, seed=seed
+    jaws_npas_pre_post_probs = [
+        np.zeros((len(seeds), len(x), 2)) for x in jaws_npas_pre_post
+    ]  # dd naive probabilities
+
+    accuracies = np.zeros((len(seeds), 2))  # train test
+    precisions = np.zeros((len(seeds), 4))  # train train test test
+    recalls = np.zeros((len(seeds), 4))  # train train test test
+    cm_train = np.zeros((2, 2))
+    cm_test = np.zeros((2, 2))
+
+    run = 0
+    for seed in seeds:
+        np.random.seed(seed)
+
+        X_train, X_test, y_train, y_test = clean_data.split_data(
+            feature_df, target_df_outliers_removed, train_amount, seed=seed
+        )
+
+        X_train_norm, X_test_norm = clean_data.normalize_data(
+            X_train, X_test, min_max=False
+        )
+
+        jaws_npas_pre_post_dropped_norm = [
+            clean_data.normalize_data(
+                X_train, jaws_npas_pre_post_dropped[i], min_max=False
+            )[1]
+            for i in range(len(jaws_npas_pre_post_dropped))
+        ]
+
+        clf = MLPClassifier(
+            hidden_layer_sizes=(200, 100),
+            activation="relu",
+            solver="adam",
+            random_state=seed,
+            max_iter=50000,
+            alpha=1e-5,
+            max_fun=50000,
+            learning_rate_init=1e-2,
+            learning_rate="adaptive",
+            epsilon=1e-8,
+            shuffle=True,
+            early_stopping=False,
+            verbose=False,
+            tol=1e-4,
+            n_iter_no_change=10,
+        )
+
+        clf.fit(X_train_norm, y_train)
+
+        jaws_npas_predicts = [clf.predict(x) for x in jaws_npas_pre_post_dropped_norm]
+        jaws_npas_probs = [
+            clf.predict_proba(x) for x in jaws_npas_pre_post_dropped_norm
+        ]
+
+        for i in range(len(jaws_npas_pre_post_dropped)):
+            ### FIND PROBABILITIES FOR ALL CELLS
+            jaws_npas_pre_post_probs[i][run, :, :] = jaws_npas_probs[i]
+
+            ### FIND PREDICTED PROPORTIONS OF CLASSES
+            # jaws precicted DD %
+            jaws_npas_pre_post_predicts[i][run, 0] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                    & (jaws_npas_predicts[i] == 0)
+                ]
+            ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "JAWS"])
+            # jaws precicted naive %
+            jaws_npas_pre_post_predicts[i][run, 1] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                    & (jaws_npas_predicts[i] == 1)
+                ]
+            ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "JAWS"])
+            # npas precicted DD %
+            jaws_npas_pre_post_predicts[i][run, 2] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 0)
+                ]
+            ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "NPAS"])
+            # npas precicted naive %
+            jaws_npas_pre_post_predicts[i][run, 3] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 1)
+                ]
+            ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "NPAS"])
+
+            ### FIND PREDICTED PROPORTIONS OF CLASSES BY MEDIAL
+            jaws_npas_pre_post_predicts_medial[i][run, 0] = (
+                len(
+                    jaws_npas_predicts[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_predicts[i] == 0)
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                / len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                if len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                > 0
+                else 0
+            )
+            # jaws precicted naive %
+            jaws_npas_pre_post_predicts_medial[i][run, 1] = (
+                len(
+                    jaws_npas_predicts[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_predicts[i] == 1)
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                / len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                if len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1)
+                    ]
+                )
+                > 0
+                else 0
+            )
+            # npas precicted DD %
+            jaws_npas_pre_post_predicts_medial[i][run, 2] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 0)
+                    & (jaws_npas_pre_post[i]["Medial"] == 1)
+                ]
+            ) / len(
+                jaws_npas_pre_post[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[i]["Medial"] == 1)
+                ]
+            )
+            # npas precicted naive %
+            jaws_npas_pre_post_predicts_medial[i][run, 3] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 1)
+                    & (jaws_npas_pre_post[i]["Medial"] == 1)
+                ]
+            ) / len(
+                jaws_npas_pre_post[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[i]["Medial"] == 1)
+                ]
             )
 
-            X_train_norm, X_test_norm = clean_data.normalize_data(
-                X_train, X_test, min_max=False
+            ### FIND PREDICTED PROPORTIONS OF CLASSES BY NON MEDIAL
+            jaws_npas_pre_post_predicts_non_medial[i][run, 0] = (
+                len(
+                    jaws_npas_predicts[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_predicts[i] == 0)
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                / len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                if len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                > 0
+                else 0
+            )
+            # jaws precicted naive %
+            jaws_npas_pre_post_predicts_non_medial[i][run, 1] = (
+                len(
+                    jaws_npas_predicts[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_predicts[i] == 1)
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                / len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                if len(
+                    jaws_npas_pre_post[i][
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0)
+                    ]
+                )
+                > 0
+                else 0
+            )
+            # npas precicted DD %
+            jaws_npas_pre_post_predicts_non_medial[i][run, 2] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 0)
+                    & (jaws_npas_pre_post[i]["Medial"] == 0)
+                ]
+            ) / len(
+                jaws_npas_pre_post[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[i]["Medial"] == 0)
+                ]
+            )
+            # npas precicted naive %
+            jaws_npas_pre_post_predicts_non_medial[i][run, 3] = len(
+                jaws_npas_predicts[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_predicts[i] == 1)
+                    & (jaws_npas_pre_post[i]["Medial"] == 0)
+                ]
+            ) / len(
+                jaws_npas_pre_post[i][
+                    (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[i]["Medial"] == 0)
+                ]
             )
 
-            X_train_removed = X_train_norm.drop(feature, axis=1)
-            X_test_removed = X_test_norm.drop(feature, axis=1)
+        predicts_train = clf.predict(X_train_norm)
+        predicts_test = clf.predict(X_test_norm)
 
-            X_train_removed = X_train_norm.copy()
-            X_train_removed[feature] = 0
-
-            X_test_removed = X_test_norm.copy()
-            X_test_removed[feature] = 0
-
-            clf = MLPClassifier(
-                hidden_layer_sizes=(200, 100),
-                activation="relu",
-                solver="adam",
-                random_state=seed,
-                max_iter=50000,
-                alpha=1e-5,
-                max_fun=50000,
-                learning_rate_init=1e-2,
-                learning_rate="adaptive",
-                epsilon=1e-8,
-                shuffle=True,
-                early_stopping=False,
-                verbose=False,
-                tol=1e-4,
-                n_iter_no_change=10,
-            )
-
-            clf.fit(X_train_norm, y_train)
-            # clf_removed.fit(X_train_removed, y_train)
-
-            probs = clf.predict_proba(X_test_norm)
-            # probs_removed = clf_removed.predict_proba(X_test_removed)
-            probs_removed = clf.predict_proba(X_test_removed)
-
-            naive_data.extend(probs[y_test == 1, 1])
-            naive_data_removed.extend(probs_removed[y_test == 1, 1])
-            dd_data.extend(probs[y_test == 0, 0])
-            dd_data_removed.extend(probs_removed[y_test == 0, 0])
-
-        dd_data = np.asarray(dd_data)
-        naive_data = np.asarray(naive_data)
-        dd_data_removed = np.asarray(dd_data_removed)
-        naive_data_removed = np.asarray(naive_data_removed)
-
-        acc_dd = len(dd_data[dd_data > 0.5]) / len(dd_data)
-        acc_removed_dd = len(dd_data_removed[dd_data_removed > 0.5]) / len(
-            dd_data_removed
+        accuracies[run, 0] = accuracy_score(y_train, predicts_train)
+        accuracies[run, 1] = accuracy_score(y_test, predicts_test)
+        precisions[run, :2], recalls[run, :2], _, _ = precision_recall_fscore_support(
+            y_train, predicts_train
+        )
+        precisions[run, 2:], recalls[run, 2:], _, _ = precision_recall_fscore_support(
+            y_test, predicts_test
         )
 
-        acc_naive = len(naive_data[naive_data > 0.5]) / len(naive_data)
-        acc_removed_naive = len(naive_data_removed[naive_data_removed > 0.5]) / len(
-            naive_data_removed
-        )
+        cm_train += confusion_matrix(y_train, predicts_train, labels=clf.classes_)
+        cm_test += confusion_matrix(y_test, predicts_test, labels=clf.classes_)
 
-        axes2[axis_plot].scatter(acc_dd, acc_removed_dd, color="k")
-        axes2[axis_plot].scatter(acc_naive, acc_removed_naive, color="gray")
+        run += 1
 
-        sns.regplot(
-            x=dd_data[(dd_data > 0.5) & (dd_data_removed > 0.5)],
-            y=dd_data_removed[(dd_data > 0.5) & (dd_data_removed > 0.5)],
-            color="b",
-            scatter_kws={"s": 2},
-            ax=axes[axis_plot],
-        )
-        sns.regplot(
-            x=naive_data[(naive_data > 0.5) & (naive_data_removed > 0.5)],
-            y=naive_data_removed[(naive_data > 0.5) & (naive_data_removed > 0.5)],
-            color="r",
-            scatter_kws={"s": 2},
-            ax=axes[axis_plot],
-        )
-        axes[axis_plot].set_xlabel("All", fontsize=6)
-        axes[axis_plot].set_ylabel(f"{feature}", fontsize=6)
-        axes[axis_plot].plot([0.5, 1], [0.5, 1], color="k", lw=0.5, ls="dashed")
-        axes[axis_plot].set_xlim([0.5, 1])
-        axes[axis_plot].set_ylim([0.5, 1])
-        xlims = axes2[axis_plot].get_xlim()
-        ylims = axes2[axis_plot].get_ylim()
-        axes2[axis_plot].plot(
-            [np.min([xlims[0], ylims[0]]), np.max([xlims[1], ylims[1]])],
-            [np.min([xlims[0], ylims[0]]), np.max([xlims[1], ylims[1]])],
-            color="k",
-            ls="dashed",
-            lw=0.5,
-        )
-        axes2[axis_plot].set_xlim(
-            [np.min([xlims[0], ylims[0]]), np.max([xlims[1], ylims[1]])]
-        )
-        axes2[axis_plot].set_ylim(
-            [np.min([xlims[0], ylims[0]]), np.max([xlims[1], ylims[1]])]
-        )
-        axis_plot += 1
-    makeNice(axes, labelsize=6)
-    fig.savefig(f"../data/feature_removal_probabilities.pdf", bbox_inches="tight")
+    print(np.mean(accuracies, axis=0))
 
-    makeNice(axes2, labelsize=6)
-    fig2.savefig(
-        f"../data/feature_removal_probabilities_summary.pdf", bbox_inches="tight"
+    fig, ax = plt.subplots(3, 2, figsize=(8, 6), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(3) for j in range(2)]
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=[0, 1])
+
+    disp.plot(ax=axes[0], im_kw={"aspect": "auto"}, values_format=".0f")
+    axes[0].set_title(
+        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f}\nPrecision: {np.mean(precisions[:,1]):.02f}, {np.mean(precisions[:,0]):.02f}\nRecall: {np.mean(recalls[:,1]):.02f}, {np.mean(recalls[:,0]):.02f}",
+        fontsize=10,
     )
 
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=[0, 1])
+    disp.plot(ax=axes[1], im_kw={"aspect": "auto"}, values_format=".0f")
+    axes[1].set_title(
+        f"Accuracy: {np.mean(accuracies[:,1],axis=0):.02f}\nPrecision: {np.mean(precisions[:,3]):.02f}, {np.mean(precisions[:,2]):.02f}\nRecall: {np.mean(recalls[:,3]):.02f}, {np.mean(recalls[:,2]):.02f}",
+        fontsize=10,
+    )
+
+    axes[2].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+    )
+
+    axes[2].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+    )
+
+    axes[3].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dashed",
+    )
+
+    axes[3].errorbar(
+        np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dashed",
+    )
+
+    axes[3].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 1])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dotted",
+    )
+
+    axes[3].errorbar(
+        np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
+        [
+            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 3])
+            for i in range(len(jaws_npas_pre_post))
+        ],
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dotted",
+    )
+
+    axes[4].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 1
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 1
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+    )
+
+    axes[4].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 1
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 1
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+    )
+
+    axes[5].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dashed",
+    )
+
+    axes[5].errorbar(
+        np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 1),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dashed",
+    )
+
+    axes[5].errorbar(
+        np.arange(len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="b",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dotted",
+    )
+
+    axes[5].errorbar(
+        np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
+        np.mean(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        yerr=scipy.stats.sem(
+            [
+                np.mean(
+                    jaws_npas_pre_post_probs[i][
+                        :,
+                        (jaws_npas_pre_post[i]["mouse"] == "NPAS")
+                        & (jaws_npas_pre_post[i]["Medial"] == 0),
+                        1,
+                    ],
+                    axis=1,
+                )
+                for i in range(len(jaws_npas_pre_post))
+            ],
+            axis=1,
+        ),
+        color="r",
+        lw=0.5,
+        markersize=4,
+        capsize=4,
+        marker="o",
+        ls="dotted",
+    )
+
+    axes[2].legend(fancybox=False, frameon=False, fontsize=6)
+    axes[3].legend(fancybox=False, frameon=False, fontsize=6, ncols=2)
+
+    for i in range(2):
+        axes[i].set_xticks([0, 1])
+        axes[i].set_xticklabels(["DD", "Naive"])
+        axes[i].set_yticks([0, 1])
+        axes[i].set_yticklabels(["DD", "Naive"])
+
+    for i in [2, 3, 4, 5]:
+        axes[i].set_ylabel("Predicted Naive %" if i != 5 else "Naive Probability")
+        axes[i].set_xticks([0, 1, 2, 3])
+        xlim = axes[i].get_xlim()
+        if i == 3 or i == 2:
+            axes[i].hlines(
+                1 - np.mean(precisions[:, 0]),
+                xlim[0],
+                xlim[1],
+                color="k",
+                lw=0.5,
+                ls="dashed",
+            )
+            axes[i].hlines(
+                1 - np.mean(recalls[:, 0]),
+                xlim[0],
+                xlim[1],
+                color="k",
+                lw=0.5,
+                ls="dotted",
+            )
+            axes[i].set_xlim(xlim)
+
+        if i == 3 or i == 5:
+            axes[i].set_xticks(np.arange(len(jaws_npas_pre_post) * 2))
+            axes[i].set_xticklabels(
+                [
+                    f"Jaws-Pre",
+                    30,
+                    60,
+                    "90-120",
+                    "150-210",
+                    f"Npas-Pre",
+                    30,
+                    60,
+                    "90-120",
+                    "150-210",
+                ]
+            )
+        else:
+            axes[i].set_xticks(np.arange(len(jaws_npas_pre_post)))
+            axes[i].set_xticklabels(
+                [
+                    f"Pre",
+                    30,
+                    60,
+                    "90-120",
+                    "150-210",
+                ]
+            )
+    [axes[i].grid(lw=0.1, alpha=0.5) for i in range(2, len(axes))]
+
+    makeNice(axes[2:], labelsize=6)
+    match_axis(axes[2:4], type="y")
+    match_axis(axes[4:], type="y")
+    add_fig_labels(axes)
+    fig.savefig(
+        f"../data/neural_net/motor_rescue_conf_mat.pdf",
+        transparent=True,
+        bbox_inches="tight",
+    )
     plt.close()
     if show:
-        run_cmd(f"open ../data/feature_removal_probabilities_summary.pdf")
-        run_cmd(f"open ../data/feature_removal_probabilities.pdf")
+        run_cmd("open ../data/neural_net/motor_rescue_conf_mat.pdf")
 
 
-def predict_motor_rescue(
+def predict_motor_rescue_archive(
     target_df,
     feature_array,
     train_amount,
@@ -1515,36 +2024,65 @@ def predict_motor_rescue(
     )"""
 
     print(
-        [len(x[x[:, 0] > 0.9, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_jaws_all]
+        [len(x[x[:, 0] > 0.8, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_jaws_all]
     )
     print(
-        [len(x[x[:, 0] > 0.9, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_npas_all]
+        [len(x[x[:, 0] > 0.8, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_npas_all]
     )
 
     print(
-        [len(x[x[:, 1] > 0.9, 1]) / len(x[x[:, 1] > 0.5, 1]) for x in predict_jaws_all]
+        [len(x[x[:, 1] > 0.8, 1]) / len(x[x[:, 1] > 0.5, 1]) for x in predict_jaws_all]
     )
     print(
-        [len(x[x[:, 1] > 0.9, 1]) / len(x[x[:, 1] > 0.5, 1]) for x in predict_npas_all]
+        [len(x[x[:, 1] > 0.8, 1]) / len(x[x[:, 1] > 0.5, 1]) for x in predict_npas_all]
     )
 
-    fig, ax = plt.subplots(1, 1, figsize=(4, 3), dpi=300, tight_layout=True)
+    thres = 0.75
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6), dpi=300, tight_layout=True)
     ax.plot(
         np.arange(5),
-        [len(x[x[:, 0] > 0.9, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_jaws_all],
+        [
+            len(x[x[:, 0] > thres, 0]) / len(x[x[:, 0] > 0.5, 0])
+            for x in predict_jaws_all
+        ],
         marker="o",
         color="b",
-        label="Jaws",
+        label="Jaws DD",
     )
     ax.plot(
         np.arange(5),
-        [len(x[x[:, 0] > 0.9, 0]) / len(x[x[:, 0] > 0.5, 0]) for x in predict_npas_all],
+        [
+            len(x[x[:, 0] > thres, 0]) / len(x[x[:, 0] > 0.5, 0])
+            for x in predict_npas_all
+        ],
         marker="o",
         color="r",
-        label="Npas",
+        label="Npas DD",
+    )
+    ax.plot(
+        np.arange(5),
+        [
+            len(x[x[:, 1] > thres, 1]) / len(x[x[:, 1] > 0.5, 1])
+            for x in predict_jaws_all
+        ],
+        marker="o",
+        color="b",
+        label="Jaws Naive",
+        ls="dashed",
+    )
+    ax.plot(
+        np.arange(5),
+        [
+            len(x[x[:, 1] > thres, 1]) / len(x[x[:, 1] > 0.5, 1])
+            for x in predict_npas_all
+        ],
+        marker="o",
+        color="r",
+        label="Npas Naive",
+        ls="dashed",
     )
     ax.legend()
-    ax.set_ylabel("% DD Prob > 0.9 ")
+    ax.set_ylabel(f"% Prob > {thres}")
     ax.set_xticks(np.arange(5))
     ax.set_xticklabels(["Pre-Stim", "30min", "60min", "90-120min", "150-210min"])
     makeNice(ax)
@@ -2148,9 +2686,7 @@ def plot_predict_cont_mat(
         )
         axes2[i].set_ylim(ylims)
     makeNice(axes2)
-    fig2.savefig(
-        "../data/neural_net/motor_rescue_probs_hist.pdf", bbox_inches="tight"
-    )
+    fig2.savefig("../data/neural_net/motor_rescue_probs_hist.pdf", bbox_inches="tight")
     plt.close()
 
     labels = ["Pre", "30 min", "60 min", "90-120 min", "150-210 min"]
@@ -2189,9 +2725,7 @@ def plot_predict_cont_mat(
         axes3[i].set_xlabel(f"Naive Prob {labels[i]}", fontsize=6)
         axes3[i].set_ylabel(f"Proportion", fontsize=6)
     makeNice(axes3, labelsize=6)
-    fig3.savefig(
-        "../data/neural_net/motor_rescue_probs_ecdf.pdf", bbox_inches="tight"
-    )
+    fig3.savefig("../data/neural_net/motor_rescue_probs_ecdf.pdf", bbox_inches="tight")
     plt.close()
     if show:
         run_cmd("open ../data/neural_net/motor_rescue_conf_mat.pdf")

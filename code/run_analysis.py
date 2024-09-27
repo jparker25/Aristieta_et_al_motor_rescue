@@ -27,7 +27,9 @@ def get_naive_dd_training_data_set():
 
     naive_frs = np.loadtxt("../data/training/naive_neurons/cell_baseline_frs.txt")
     naive_cvs = np.loadtxt("../data/training/naive_neurons/cell_baseline_cvs.txt")
-    naive_lengths = np.loadtxt("../data/training/naive_neurons/cell_baseline_lengths.txt")
+    naive_lengths = np.loadtxt(
+        "../data/training/naive_neurons/cell_baseline_lengths.txt"
+    )
 
     naive_burst_statistics = np.loadtxt(
         "../data/training/naive_neurons/cell_baseline_burst_statistics.txt"
@@ -40,7 +42,9 @@ def get_naive_dd_training_data_set():
         "../data/training/dd_neurons/cell_baseline_burst_statistics.txt"
     )
 
-    naive_mouse = open(f"../data/training/naive_neurons/cell_mouse.txt", "r").readlines()
+    naive_mouse = open(
+        f"../data/training/naive_neurons/cell_mouse.txt", "r"
+    ).readlines()
     naive_folder = open(
         f"../data/training/naive_neurons/cell_folders.txt", "r"
     ).readlines()
@@ -110,7 +114,8 @@ def get_naive_dd_training_data_set():
     return naive_df, dd_df, pd.concat([naive_df, dd_df], ignore_index=True)
 
 
-def get_jaws_npas_data_set(source_path):
+def get_jaws_npas_data_set():
+    source_path = "../data/training"
     dataframes = []
     paths = [
         "jaws_neurons/pre_opto",
@@ -119,6 +124,7 @@ def get_jaws_npas_data_set(source_path):
         "npas_neurons/post_opto",
     ]
     is_medial = []
+    path_count = 0
     for path in paths:
         is_medial.append(
             np.loadtxt(f"{source_path}/{path}/is_medial.txt", delimiter=",")
@@ -135,12 +141,18 @@ def get_jaws_npas_data_set(source_path):
         folder = open(f"{source_path}/{path}/cell_folders.txt", "r").readlines()
         cell_names = open(f"{source_path}/{path}/cell_names.txt", "r").readlines()
 
+        post_times = np.zeros(len(frs))
+        if path_count == 1 or path_count == 3:
+            post_times = np.loadtxt(
+                f"{source_path}/{'jaws' if path_count == 1 else 'npas'}_neurons/post_opto/cell_post_times.txt"
+            )
+
         df = pd.DataFrame(
             {
                 "FR": frs,
                 "CV": cvs,
                 # "T": lengths,
-                "Delta Osc": osc_data[:, 0],
+                # "Delta Osc": osc_data[:, 0],
                 "Delta Power": osc_data[:, 1 if renewal_power else 2],
                 # "Beta Osc": osc_data[:, 4],
                 "Beta Power": osc_data[:, 5 if renewal_power else 6],
@@ -154,27 +166,16 @@ def get_jaws_npas_data_set(source_path):
                 # "Avg Surprise": burst_statistics[:, 7],
                 "Non Bursting Firing Rate": burst_statistics[:, 8],
                 "Burst Firing Rate Increase": burst_statistics[:, 9],
-                "mouse": mouse,
+                "mouse": "JAWS" if path_count < 2 else "NPAS",
                 "folder": folder,
                 "name": cell_names,
+                "Post-Time": post_times,
+                "Medial": is_medial[path_count],
             }
         )
+        path_count += 1
         dataframes.append(df)
-    jaws_post_times = np.loadtxt(
-        f"{source_path}/jaws_neurons/post_opto/cell_post_times.txt"
-    )
-    npas_post_times = np.loadtxt(
-        f"{source_path}/npas_neurons/post_opto/cell_post_times.txt"
-    )
-    return (
-        dataframes[0],
-        dataframes[1],
-        dataframes[2],
-        dataframes[3],
-        jaws_post_times,
-        npas_post_times,
-        is_medial,
-    )
+    return pd.concat(dataframes, ignore_index=True)
 
 
 def generate_post_dataframes(dataframe, times, time_chunks, is_medial):
@@ -204,117 +205,32 @@ def generate_post_dataframes(dataframe, times, time_chunks, is_medial):
     return chunked_data
 
 
-### TRAINING DATA SET ###
+def generate_pre_post_dataframes(
+    jaws_npas_df, time_chunks=[[0], [30], [60], [90, 120], [150, 180, 210]]
+):
+    pre_post_dfs = []
+    for chunk in time_chunks:
+        pre_post_dfs.append(jaws_npas_df[jaws_npas_df["Post-Time"].isin(chunk)])
+    return pre_post_dfs
+
+
+# get cont and pulse naive dd datasets
 naive_df, dd_df, df = get_naive_dd_training_data_set()
 
-### TRAINING DATA SET FOR EPHYS ###
-(
-    jaws_pre_df,
-    jaws_post_df,
-    npas_pre_df,
-    npas_post_df,
-    jaws_post_times,
-    npas_post_times,
-    is_medial,
-) = get_jaws_npas_data_set("../data/training")
+# get npas and jaws data sets, chunk into list of data frames pre and post
+jaws_npas_df = get_jaws_npas_data_set()
+jaws_npas_pre_post = generate_pre_post_dataframes(jaws_npas_df)
 
-### CONSTRUCT VARIABLES FOR EASIER USAGE ##
-motor_rescue_dfs = [jaws_pre_df, jaws_post_df, npas_pre_df, npas_post_df]
-
-
-### CHUNKING DATA
-chunked = True
-time_chunks = [30, 60, 90, 120, 150, 180, 210]  # time intervals
-if chunked:  # create groups of time intervals
-    # time_chunks = [30, 60, [90, 120], [150, 180, 210]]
-    time_chunks = [30, 60, [90, 120], [150, 180, 210]]
-
-### GET POST DATA BASED ON TIME CHUNKS
-post_npas_dfs = generate_post_dataframes(
-    npas_post_df, npas_post_times, time_chunks, is_medial[3]
+# combine pre data for jaws and npas to training data
+training_df = df.copy()
+training_df = training_df.drop(columns=["mouse", "folder", "name"])
+jaws_npas_pre = jaws_npas_pre_post[0].copy()
+jaws_npas_pre = jaws_npas_pre.drop(
+    columns=["mouse", "folder", "name", "Post-Time", "Medial"]
 )
-post_jaws_dfs = generate_post_dataframes(
-    jaws_post_df, jaws_post_times, time_chunks, is_medial[1]
-)
+jaws_npas_pre.insert(0, "Type", np.zeros(len(jaws_npas_pre)))
 
-### GET OSCILLATIONS
-motor_rescue_dfs_osc = [
-    jaws_pre_df["Delta Osc"],
-    jaws_post_df["Delta Osc"],
-    npas_pre_df["Delta Osc"],
-    npas_post_df["Delta Osc"],
-]
-
-### GET POST OSCILLATIONS
-post_npas_dfs_osc = [x["Delta Osc"] for x in post_npas_dfs]
-post_jaws_dfs_osc = [x["Delta Osc"] for x in post_jaws_dfs]
-
-### PARSE DFS WITHOUT OSCILLATION DATA
-motor_rescue_dfs = [x.drop(["Delta Osc"], axis=1) for x in motor_rescue_dfs]
-post_npas_dfs = [x.drop(["Delta Osc"], axis=1) for x in post_npas_dfs]
-post_jaws_dfs = [x.drop(["Delta Osc"], axis=1) for x in post_jaws_dfs]
-
-### COMBINE PRE STIM MOTOR DFS FOR TRAINING
-pre_motor_df = pd.concat([motor_rescue_dfs[0], motor_rescue_dfs[2]])
-pre_motor_df["Type"] = 0
-
-### LABELS FOR PLOTTING CHUNKS
-show = False
-xlabels = [
-    f"{30*i+30}\nn={len(post_jaws_dfs[i])}\nn={len(post_npas_dfs[i])}"
-    for i in range(len(post_jaws_dfs))
-]
-xlabels.insert(0, "Pre-Stim")
-ylabels = [int(x) for x in np.unique(jaws_post_times)]
-
-if chunked:
-    xlabels = [
-        f"Pre-Stim\nJAWS n={len(motor_rescue_dfs[0])}\nNpas n={len(motor_rescue_dfs[2])}",
-        f"30\nn={len(post_jaws_dfs[0])}\nn={len(post_npas_dfs[0])}",
-        f"60\nn={len(post_jaws_dfs[1])}\nn={len(post_npas_dfs[1])}",
-        f"90-120\nn={len(post_jaws_dfs[2])}\nn={len(post_npas_dfs[2])}",
-        f"150-210\nn={len(post_jaws_dfs[3])}\nn={len(post_npas_dfs[3])}",
-    ]
-    ylabels = [30, 60, "90-120", "150-210"]
-
-
-### COMBINE NAIVE AND DD DATAFRAMES INTO ONE
-df = pd.concat([naive_df, dd_df])
-df_type = df.pop("Type")
-df.insert(df.shape[1], "Type", df_type)
-df = pd.concat([df, pre_motor_df], ignore_index=True)
-
-### ASSIGN LABELS FOR NAIVE AND DD
-combined_naive_df = df[df["Type"] == 1]
-combined_dd_df = df[df["Type"] == 0]
-
-df = pd.concat([combined_naive_df, combined_dd_df])
-
-"""
-### PLOT FEATURE SPACE ###
-plot_features = False
-if plot_features:
-    plot_data.bursts_delta(df)
-    
-    plot_data.plot_feature_histograms(df)
-    plot_data.plot_feature_histograms_normed_together(df)
-    plot_data.plot_feature_histograms_normed_by_group(df)
-    plot_data.plot_feature_histogram_comparison(df, motor_rescue_dfs)
-    plot_data.plot_ephys_pre_post(motor_rescue_dfs[0], motor_rescue_dfs[1], "jaws")
-    plot_data.plot_ephys_pre_post(motor_rescue_dfs[2], motor_rescue_dfs[3], "npas")
-    plot_data.feature_time(
-        motor_rescue_dfs, post_jaws_dfs, post_npas_dfs, xlabels, show=show
-    )
-    plot_data.feature_fail(
-        motor_rescue_dfs[0],
-        motor_rescue_dfs[2],
-        post_jaws_dfs,
-        post_npas_dfs,
-        ylabels,
-        show=show,
-    )
-"""
-
+combined_df = pd.concat([training_df, jaws_npas_pre], ignore_index=True)
 
 ### REMOVE OUTLIERS ###
 zscore_threshold = 3
@@ -332,31 +248,6 @@ feature_outlier_strength = {
     "Non Bursting Firing Rate": zscore_threshold,
     "Burst Firing Rate Increase": zscore_threshold,
 }
-
-df = clean_data.remove_outliers_by_group_zscore_independent(
-    combined_naive_df, combined_dd_df, feature_outlier_strength
-)
-
-df.to_csv("../data/df.csv")
-
-# plot bursts vs delta power
-plot_data.bursts_delta(df)
-
-### PLOT FEATURES HISTOGRAMS FOR TRAINING ###
-plot_data.plot_feature_histograms(df)
-
-# Plot pre and post JAWS and Npas features
-plot_data.feature_time(
-    motor_rescue_dfs, post_jaws_dfs, post_npas_dfs, xlabels, show=show
-)
-
-# Plot pre and post histograms for Jaws and Npas
-plot_data.plot_pre_post_histograms(
-    motor_rescue_dfs, post_jaws_dfs, post_npas_dfs, show=show
-)
-
-# plot corr matrix
-plot_data.plot_corr_matrix(df)
 
 ### SELECT FEATURES TO USE IN ANALYSIS ###
 use_feature = {
@@ -390,344 +281,11 @@ for col in df.columns:
         feature_array.append(count)
     count += 1
 
-### SELECT WHICH ANALYSIS TO RUN ###
-plot_pca = False
-plot_logistic = False
-show = False
-
-train_amount = 0.8
-grid_search = False
-
-motor_rescue_predict = True
-motor_rescue_feature_importance = False
-motor_rescue_detec_osc = False
-
-
-if motor_rescue_feature_importance:
-    run_neural_net.feature_importance_selected(
-        df, feature_array, train_amount, seeds=10, show=True
-    )
-    sys.exit()
-    run_neural_net.feature_importance(df, feature_array, train_amount, show=show)
-    run_neural_net.feature_removal_probabilities(
-        df, feature_array, train_amount, show=show
-    )
-
-if motor_rescue_predict:
-    run_neural_net.predict_motor_rescue(
-        df,
-        feature_array,
-        train_amount,
-        motor_rescue_dfs,
-        post_jaws_dfs,
-        post_npas_dfs,
-        jaws_post_times,
-        npas_post_times,
-        is_medial,
-        show=show,
-    )
-    sys.exit()
-    plot_data.plot_features_probabilities(combined_naive_df, combined_dd_df)
-    plot_data.plot_feature_percent_correct(combined_naive_df, combined_dd_df, bins=20)
-
-if motor_rescue_detec_osc:
-    run_neural_net.plot_osc_over_time(
-        feature_array,
-        motor_rescue_dfs,
-        post_jaws_dfs,
-        post_npas_dfs,
-        motor_rescue_dfs_osc,
-        jaws_post_times,
-        post_jaws_dfs_osc,
-        npas_post_times,
-        post_npas_dfs_osc,
-        is_medial,
-        show=show,
-    )
-
-if plot_logistic:
-    run_logistic_regression.logistic_regression_on_df(
-        df,
-        feature_array,
-        train_amount,
-        motor_rescue_dfs,
-        post_jaws_dfs,
-        post_npas_dfs,
-        jaws_post_times,
-        npas_post_times,
-        is_medial,
-        show=show,
-    )
-
-if plot_pca:
-    run_pca.pca_on_df(
-        df,
-        feature_array,
-        motor_rescue_dfs,
-        post_jaws_dfs,
-        post_npas_dfs,
-        xlabels,
-        chunked,
-        n_components_to_display=3,
-        show=show,
-    )
-
-
-### OLD CODE
-
-"""export_data = np.zeros(((len(time_chunks) + 1) * 2, 12 * 3))
-col_labels = []
-count = 0
-for col in df.columns:
-    if col != "Type" and col != "mouse" and col != "folder" and col != "name":
-        ### EXPORT MEANS ####
-        col_labels.append(f"{col} Mean")
-        export_data[0, count * 3] = np.mean(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3] = [
-            np.mean(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3] = np.mean(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3] = [
-            np.mean(x[col]) for x in post_npas_dfs
-        ]
-        ### EXPORT SEM ###
-        col_labels.append(f"{col} SEM")
-        export_data[0, count * 3 + 1] = stats.sem(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3 + 1] = [
-            stats.sem(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3 + 1] = stats.sem(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3 + 1] = [
-            stats.sem(x[col]) for x in post_npas_dfs
-        ]
-        ### EXPORT STD ###
-        col_labels.append(f"{col} STD")
-        export_data[0, count * 3 + 2] = np.std(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3 + 2] = [
-            np.std(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3 + 2] = np.std(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3 + 2] = [
-            np.std(x[col]) for x in post_npas_dfs
-        ]
-        count += 1
-
-export_df = pd.DataFrame(
-    data=export_data,
-    columns=col_labels,
-    index=[
-        "Pre-Stim JAWS",
-        "Post 30 JAWS",
-        "Post 60 JAWS",
-        "Post 90-120 JAWS",
-        "Post 150-210 JAWS",
-        "Pre-Stim Npas",
-        "Post 30 Npas",
-        "Post 60 Npas",
-        "Post 90-120 Npas",
-        "Post 150-210 Npas",
-    ],
+run_neural_net.predict_motor_rescue(
+    combined_df,
+    feature_array,
+    feature_outlier_strength,
+    jaws_npas_pre_post,
+    seeds=np.arange(15),
+    show=True,
 )
-n_counts = [len(motor_rescue_dfs[0])]
-n_counts.extend([len(post_jaws_dfs[i]) for i in range(len(post_jaws_dfs))])
-n_counts.extend([len(motor_rescue_dfs[2])])
-n_counts.extend([len(post_npas_dfs[i]) for i in range(len(post_npas_dfs))])
-export_df["n"] = n_counts
-
-export_df.to_csv("../data/features_over_time.csv")
-
-export_data = np.zeros(((len(time_chunks) + 1) * 2, 12 * 3))
-col_labels = []
-count = 0
-for col in df.columns:
-    if col != "Type" and col != "mouse" and col != "folder" and col != "name":
-        ### EXPORT MEANS ####
-        col_labels.append(f"{col} Mean")
-        export_data[0, count * 3] = np.mean(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3] = [
-            np.mean(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3] = np.mean(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3] = [
-            np.mean(x[col]) for x in post_npas_dfs
-        ]
-        ### EXPORT SEM ###
-        col_labels.append(f"{col} SEM")
-        export_data[0, count * 3 + 1] = stats.sem(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3 + 1] = [
-            stats.sem(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3 + 1] = stats.sem(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3 + 1] = [
-            stats.sem(x[col]) for x in post_npas_dfs
-        ]
-        ### EXPORT STD ###
-        col_labels.append(f"{col} STD")
-        export_data[0, count * 3 + 2] = np.std(motor_rescue_dfs[0][col])
-        export_data[1 : export_data.shape[0] // 2, count * 3 + 2] = [
-            np.std(x[col]) for x in post_jaws_dfs
-        ]
-        export_data[export_data.shape[0] // 2, count * 3 + 2] = np.std(
-            motor_rescue_dfs[2][col]
-        )
-        export_data[export_data.shape[0] // 2 + 1 :, count * 3 + 2] = [
-            np.std(x[col]) for x in post_npas_dfs
-        ]
-        count += 1
-
-export_df = pd.DataFrame(
-    data=export_data,
-    columns=col_labels,
-    index=[
-        "Pre-Stim JAWS",
-        "Post 30 JAWS",
-        "Post 60 JAWS",
-        "Post 90-120 JAWS",
-        "Post 150-210 JAWS",
-        "Pre-Stim Npas",
-        "Post 30 Npas",
-        "Post 60 Npas",
-        "Post 90-120 Npas",
-        "Post 150-210 Npas",
-    ],
-)
-n_counts = [len(motor_rescue_dfs[0])]
-n_counts.extend([len(post_jaws_dfs[i]) for i in range(len(post_jaws_dfs))])
-n_counts.extend([len(motor_rescue_dfs[2])])
-n_counts.extend([len(post_npas_dfs[i]) for i in range(len(post_npas_dfs))])
-export_df["n"] = n_counts
-
-export_df.to_csv("../data/features_over_time.csv")
-
-# export_data[export_data.shape[0]//2,count*3+1] = np.mean(motor_rescue_dfs[0][col])
-
-"""
-
-
-"""
-jaws_pre_df["Medial"] = is_medial[0]
-npas_pre_df["Medial"] = is_medial[2]
-
-jaws_pre_df["Distance Healthy Score"] = np.loadtxt(
-    f"../data/pca/jaws_pre_distance_healthy_score.txt"
-)
-jaws_pre_df["Centroid Healthy Score"] = np.loadtxt(
-    f"../data/pca/jaws_pre_centroid_healthy_score.txt"
-)
-jaws_pre_df["Percentile Healthy Score"] = np.loadtxt(
-    f"../data/pca/jaws_pre_percentile_healthy_score.txt"
-)
-
-jaws_pre_df["Naive Probability"] = np.loadtxt(
-    f"../data/neural_net/pre_jaws_probabilities.txt", usecols=1
-)
-
-jaws_pre_df["DD Probability"] = np.loadtxt(
-    f"../data/neural_net/pre_jaws_probabilities.txt", usecols=0
-)
-
-npas_pre_df["Distance Healthy Score"] = np.loadtxt(
-    f"../data/pca/npas_pre_distance_healthy_score.txt"
-)
-npas_pre_df["Centroid Healthy Score"] = np.loadtxt(
-    f"../data/pca/npas_pre_centroid_healthy_score.txt"
-)
-npas_pre_df["Percentile Healthy Score"] = np.loadtxt(
-    f"../data/pca/npas_pre_percentile_healthy_score.txt"
-)
-
-npas_pre_df["Naive Probability"] = np.loadtxt(
-    f"../data/neural_net/pre_npas_probabilities.txt", usecols=1
-)
-
-npas_pre_df["DD Probability"] = np.loadtxt(
-    f"../data/neural_net/pre_npas_probabilities.txt", usecols=0
-)
-
-fig, ax = plt.subplots(4, 3, figsize=(12, 10), dpi=300, tight_layout=True)
-axes = [ax[i, j] for i in range(4) for j in range(3)]
-count = 0
-for col in npas_pre_df.columns[:13]:
-    if col != "Delta Osc":
-        sns.regplot(
-            data=npas_pre_df,
-            x="Naive Probability",
-            y=col,
-            color="red",
-            ax=axes[count],
-            scatter_kws={"s": 8},
-        )
-        sns.regplot(
-            data=npas_pre_df,
-            x="DD Probability",
-            y=col,
-            color="blue",
-            ax=axes[count],
-            scatter_kws={"s": 8},
-        )
-        axes[count].set_xlabel("Probability")
-        count += 1
-makeNice(axes)
-fig.savefig(f"../data/feature_probabilities_plot.pdf", bbox_inches="tight")
-plt.close()
-run_cmd("open ../data/feature_probabilities_plot.pdf")
-"""
-
-sys.exit()
-jaws_pre_df.to_csv("../data/jaws_pre_time.csv")
-npas_pre_df.to_csv("../data/npas_pre_time.csv")
-time_chunk_labels = [30, 60, "90_120", "150_180_210"]
-count = 0
-for pjdf in post_jaws_dfs:
-    """pjdf["Distance Healthy Score"] = np.loadtxt(
-        f"../data/pca/jaws_post_{time_chunk_labels[count]}_distance_healthy_score.txt"
-    )
-    pjdf["Centroid Healthy Score"] = np.loadtxt(
-        f"../data/pca/jaws_post_{time_chunk_labels[count]}_centroid_healthy_score.txt"
-    )
-    pjdf["Percentile Healthy Score"] = np.loadtxt(
-        f"../data/pca/jaws_post_{time_chunk_labels[count]}_percentile_healthy_score.txt"
-    )"""
-    pjdf["Naive Probability"] = np.loadtxt(
-        f"../data/neural_net/post_{time_chunk_labels[count]}_jaws_probabilities.txt",
-        usecols=1,
-    )
-
-    pjdf["DD Probability"] = np.loadtxt(
-        f"../data/neural_net/post_{time_chunk_labels[count]}_jaws_probabilities.txt",
-        usecols=0,
-    )
-    pjdf.to_csv(f"../data/jaws_post_time_{time_chunk_labels[count]}.csv")
-    count += 1
-count = 0
-for pjdf in post_npas_dfs:
-    """pjdf["Distance Healthy Score"] = np.loadtxt(
-        f"../data/pca/npas_post_{time_chunk_labels[count]}_distance_healthy_score.txt"
-    )
-    pjdf["Centroid Healthy Score"] = np.loadtxt(
-        f"../data/pca/npas_post_{time_chunk_labels[count]}_centroid_healthy_score.txt"
-    )
-    pjdf["Percentile Healthy Score"] = np.loadtxt(
-        f"../data/pca/npas_post_{time_chunk_labels[count]}_percentile_healthy_score.txt"
-    )"""
-    pjdf["Naive Probability"] = np.loadtxt(
-        f"../data/neural_net/post_{time_chunk_labels[count]}_npas_probabilities.txt",
-        usecols=1,
-    )
-
-    pjdf["DD Probability"] = np.loadtxt(
-        f"../data/neural_net/post_{time_chunk_labels[count]}_npas_probabilities.txt",
-        usecols=0,
-    )
-    pjdf.to_csv(f"../data/npas_post_time_{time_chunk_labels[count]}.csv")
-    count += 1
