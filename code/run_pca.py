@@ -192,8 +192,8 @@ def pca_on_df(
     axes = [ax[i, j] for i in range(4) for j in range(3)]
     fig2, ax2 = plt.subplots(4, 3, figsize=(12, 8), dpi=300, tight_layout=True)
     axes2 = [ax2[i, j] for i in range(4) for j in range(3)]
-    prob_thres_dd = 0.9
-    prob_thres_naive = 0.9
+    prob_thres_dd = 0.75
+    prob_thres_naive = 0.75
     probabilities = clf.predict_proba(X_train_norm)
     probabilities_dd = probabilities[:, 0]
     probabilities_naive = probabilities[:, 1]
@@ -312,14 +312,14 @@ def pca_on_df(
         i += 1
     makeNice(axes)
     add_fig_labels(axes)
-    fig.savefig("data/pca/prob_features_split.pdf", bbox_inches="tight")
+    fig.savefig("../data/pca/prob_features_split.pdf", bbox_inches="tight")
 
     makeNice(axes2)
     add_fig_labels(axes2)
-    fig2.savefig("data/pca/prob_features_split_cdf.pdf", bbox_inches="tight")
+    fig2.savefig("../data/pca/prob_features_split_cdf.pdf", bbox_inches="tight")
     plt.close()
-    run_cmd("open data/pca/prob_features_split.pdf")
-    run_cmd("open data/pca/prob_features_split_cdf.pdf")
+    run_cmd("open ../data/pca/prob_features_split.pdf")
+    run_cmd("open ../data/pca/prob_features_split_cdf.pdf")
 
     sys.exit()
 

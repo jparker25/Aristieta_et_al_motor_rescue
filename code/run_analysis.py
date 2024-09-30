@@ -286,6 +286,10 @@ run_neural_net.predict_motor_rescue(
     feature_array,
     feature_outlier_strength,
     jaws_npas_pre_post,
+    train_amount=0.8,
     seeds=np.arange(15),
     show=True,
+    test_outliers=False,
+    nonlinear_transforms=False,
+    min_max_scale=False,
 )

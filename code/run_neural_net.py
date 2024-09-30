@@ -556,6 +556,21 @@ def feature_importance_selected(
         run_cmd("open ../data/neural_net/feature_removal_performance_selected.pdf")
 
 
+def nonlinear_feature_transforms(df):
+    for col in df.columns:
+        df[f"{col}_sq"] = df[col] ** 2
+        df[f"{col}_cube"] = df[col] ** 3
+        df[f"{col}_abs"] = np.abs(df[col])
+        df[f"{col}_sqrt"] = np.sqrt(np.abs(df[col]))
+        df[f"{col}_sin"] = np.sin(df[col])
+        df[f"{col}_cos"] = np.cos(df[col])
+        df[f"{col}_log"] = np.log(np.abs(df[col]))
+        df[f"{col}_log10"] = np.log10(np.abs(df[col]))
+        df[f"{col}_exp"] = np.exp(df[col])
+        df[f"{col}_reciprocal"] = np.reciprocal(df[col])
+    return df
+
+
 def predict_motor_rescue(
     target_df,
     feature_array,
@@ -565,6 +580,9 @@ def predict_motor_rescue(
     train_amount=0.8,
     seeds=np.arange(5),
     show=False,
+    test_outliers=False,
+    nonlinear_transforms=False,
+    min_max_scale=False,
 ):
     target_df_outliers_removed = clean_data.remove_outliers_by_group_zscore_independent(
         target_df[target_df["Type"] == 1],
@@ -572,6 +590,56 @@ def predict_motor_rescue(
         outlier_dict,
     )
     feature_df = target_df_outliers_removed.iloc[:, feature_array]
+
+    target_df_outliers = target_df.loc[
+        ~target_df.index.isin(target_df_outliers_removed.index)
+    ]
+    y_outliers = target_df_outliers["Type"]
+    target_df_outliers = target_df_outliers.drop(columns="Type")
+
+    """fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(4) for j in range(3)]
+    count = 0
+    for col in target_df_outliers.columns:
+        bins = np.histogram_bin_edges(target_df_outliers[col], bins=20)
+        outliers_naive = target_df_outliers[y_outliers == 1][col]
+        outliers_dd = target_df_outliers[y_outliers == 0][col]
+        feat_mean = np.mean(target_df[col])
+        feat_std = np.std(target_df[col])
+        sns.histplot(
+            x=outliers_naive,
+            color="r",
+            edgecolor="w",
+            kde=True,
+            stat="probability",
+            ax=axes[count],
+            bins=bins,
+        )
+        sns.histplot(
+            x=outliers_dd,
+            color="b",
+            edgecolor="w",
+            kde=True,
+            stat="probability",
+            ax=axes[count],
+            bins=bins,
+        )
+        ylims = axes[count].get_ylim()
+        axes[count].vlines(
+            [feat_mean - feat_std, feat_mean, feat_mean + feat_std],
+            ylims[0],
+            ylims[1],
+            color="k",
+            ls="dashed",
+            lw=0.5,
+        )
+
+        count += 1
+    makeNice(axes)
+    fig.savefig("../data/outliers_features.pdf")
+    plt.close()
+    sys.exit()"""
+
     jaws_npas_pre_post_dropped = [
         x.drop(columns=["mouse", "folder", "name", "Post-Time", "Medial"])
         for x in jaws_npas_pre_post
@@ -593,11 +661,18 @@ def predict_motor_rescue(
         np.zeros((len(seeds), len(x), 2)) for x in jaws_npas_pre_post
     ]  # dd naive probabilities
 
+    outlier_probabilities = np.zeros((len(target_df_outliers), 2))
+
     accuracies = np.zeros((len(seeds), 2))  # train test
     precisions = np.zeros((len(seeds), 4))  # train train test test
     recalls = np.zeros((len(seeds), 4))  # train train test test
     cm_train = np.zeros((2, 2))
     cm_test = np.zeros((2, 2))
+
+    conf_thres = 0.75
+    nbins = 20
+    histogram_counts_dd = np.zeros((len(feature_df.columns), nbins))
+    histogram_counts_naive = np.zeros((len(feature_df.columns), nbins))
 
     run = 0
     for seed in seeds:
@@ -607,16 +682,31 @@ def predict_motor_rescue(
             feature_df, target_df_outliers_removed, train_amount, seed=seed
         )
 
+        if test_outliers:
+            X_test = pd.concat([X_test, target_df_outliers])
+            y_test = pd.concat([y_test, y_outliers])
+
+        outliers_norm = clean_data.normalize_data(
+            X_train, target_df_outliers, min_max=min_max_scale
+        )[1]
+
         X_train_norm, X_test_norm = clean_data.normalize_data(
-            X_train, X_test, min_max=False
+            X_train, X_test, min_max=min_max_scale
         )
 
         jaws_npas_pre_post_dropped_norm = [
             clean_data.normalize_data(
-                X_train, jaws_npas_pre_post_dropped[i], min_max=False
+                X_train, jaws_npas_pre_post_dropped[i], min_max=min_max_scale
             )[1]
             for i in range(len(jaws_npas_pre_post_dropped))
         ]
+
+        if nonlinear_transforms:
+            X_train_norm = nonlinear_feature_transforms(X_train_norm)
+            X_test_norm = nonlinear_feature_transforms(X_test_norm)
+            jaws_npas_pre_post_dropped_norm = [
+                nonlinear_feature_transforms(x) for x in jaws_npas_pre_post_dropped_norm
+            ]
 
         clf = MLPClassifier(
             hidden_layer_sizes=(200, 100),
@@ -636,13 +726,48 @@ def predict_motor_rescue(
             n_iter_no_change=10,
         )
 
+        # Train network
         clf.fit(X_train_norm, y_train)
 
+        # Get network statistics
+        predicts_train = clf.predict(X_train_norm)
+        predicts_test = clf.predict(X_test_norm)
+        probs_train = clf.predict_proba(X_train_norm)
+        probs_test = clf.predict_proba(X_test_norm)
+
+        col_count = 0
+        for col in feature_df.columns:
+            bins = np.histogram_bin_edges(target_df_outliers_removed[col], nbins)
+            histogram_counts_dd[col_count, :] += np.histogram(
+                X_train[(probs_train[:, 0] > conf_thres) & (y_train == 0)], bins=bins
+            )[0] / len(seeds)
+            histogram_counts_naive[col_count, :] += np.histogram(
+                X_train[(probs_train[:, 1] > conf_thres) & (y_train == 1)], bins=bins
+            )[0] / len(seeds)
+            col_count += 1
+
+        outlier_probabilities += clf.predict_proba(outliers_norm) / len(seeds)
+
+        accuracies[run, 0] = accuracy_score(y_train, predicts_train)
+        accuracies[run, 1] = accuracy_score(y_test, predicts_test)
+        precisions[run, :2], recalls[run, :2], _, _ = precision_recall_fscore_support(
+            y_train, predicts_train
+        )
+        precisions[run, 2:], recalls[run, 2:], _, _ = precision_recall_fscore_support(
+            y_test, predicts_test
+        )
+
+        # Update collective confusion matrix
+        cm_train += confusion_matrix(y_train, predicts_train, labels=clf.classes_)
+        cm_test += confusion_matrix(y_test, predicts_test, labels=clf.classes_)
+
+        # Update JAWS and NPAS datasets
         jaws_npas_predicts = [clf.predict(x) for x in jaws_npas_pre_post_dropped_norm]
         jaws_npas_probs = [
             clf.predict_proba(x) for x in jaws_npas_pre_post_dropped_norm
         ]
 
+        # Update JAWS and NPAS datasets by time chunk
         for i in range(len(jaws_npas_pre_post_dropped)):
             ### FIND PROBABILITIES FOR ALL CELLS
             jaws_npas_pre_post_probs[i][run, :, :] = jaws_npas_probs[i]
@@ -827,24 +952,152 @@ def predict_motor_rescue(
                 ]
             )
 
-        predicts_train = clf.predict(X_train_norm)
-        predicts_test = clf.predict(X_test_norm)
-
-        accuracies[run, 0] = accuracy_score(y_train, predicts_train)
-        accuracies[run, 1] = accuracy_score(y_test, predicts_test)
-        precisions[run, :2], recalls[run, :2], _, _ = precision_recall_fscore_support(
-            y_train, predicts_train
-        )
-        precisions[run, 2:], recalls[run, 2:], _, _ = precision_recall_fscore_support(
-            y_test, predicts_test
-        )
-
-        cm_train += confusion_matrix(y_train, predicts_train, labels=clf.classes_)
-        cm_test += confusion_matrix(y_test, predicts_test, labels=clf.classes_)
-
         run += 1
 
+    for i in range(len(jaws_npas_pre_post)):
+        jaws_npas_pre_post[i]["DD Probability"] = np.mean(
+            jaws_npas_pre_post_probs[i][:, :, 0], axis=0
+        )
+        jaws_npas_pre_post[i]["Naive Probability"] = np.mean(
+            jaws_npas_pre_post_probs[i][:, :, 1], axis=0
+        )
+
+    all_pre_post = pd.concat(jaws_npas_pre_post)
+    all_pre_post.to_csv("../data/neural_net/jaws_npas_pre_post.csv")
     print(np.mean(accuracies, axis=0))
+
+    fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(4) for j in range(3)]
+    count = 03
+    for col in feature_df.columns:
+        bins = np.histogram_bin_edges(target_df_outliers_removed[col], bins=nbins)
+        feat_mean_dd = np.mean(target_df[target_df["Type"] == 0][col])
+        feat_std_dd = np.std(target_df[target_df["Type"] == 0][col])
+        feat_mean_naive = np.mean(target_df[target_df["Type"] == 1][col])
+        feat_std_naive = np.std(target_df[target_df["Type"] == 1][col])
+        axes[count].bar(
+            x=np.arange(nbins),
+            height=histogram_counts_dd[count] / np.sum(histogram_counts_dd[count]),
+            color="b",
+            alpha=0.5,
+            width=0.8,
+            edgecolor="w",
+        )
+        axes[count].bar(
+            x=np.arange(nbins),
+            height=histogram_counts_naive[count]
+            / np.sum(histogram_counts_naive[count]),
+            color="r",
+            alpha=0.5,
+            width=0.8,
+            edgecolor="w",
+        )
+        ylims = axes[count].get_ylim()
+        axes[count].set_xticks(np.arange(0, nbins + 1, 5))
+        axes[count].set_xticklabels(
+            [
+                f"{x:.02E}" if count == 2 or count == 3 else f"{x:.02f}"
+                for x in bins[::5]
+            ],
+            rotation=25,
+        )
+        axes[count].vlines(
+            nbins * feat_mean_dd / (bins[-1] - bins[0]),
+            ylims[0],
+            ylims[1],
+            color="b",
+            ls="dashed",
+        )
+        axes[count].vlines(
+            nbins * (feat_mean_dd + 3 * feat_std_dd) / (bins[-1] - bins[0]),
+            ylims[0],
+            ylims[1],
+            color="b",
+            ls="dotted",
+        )
+        axes[count].vlines(
+            nbins * feat_mean_naive / (bins[-1] - bins[0]),
+            ylims[0],
+            ylims[1],
+            color="r",
+            ls="dashed",
+        )
+        axes[count].vlines(
+            nbins * (feat_mean_naive + 3 * feat_std_naive) / (bins[-1] - bins[0]),
+            ylims[0],
+            ylims[1],
+            color="r",
+            ls="dotted",
+        )
+        axes[count].set_xlabel(col)
+        axes[count].set_ylim(ylims)
+        count += 1
+    makeNice(axes)
+    fig.savefig("../data/conf_thres_features.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open ../data/conf_thres_features.pdf")
+
+    outliers_correct_naive = target_df_outliers.loc[
+        (outlier_probabilities[:, 1] > 0.5) & (y_outliers == 1), :
+    ]
+
+    outliers_correct_dd = target_df_outliers.loc[
+        (outlier_probabilities[:, 0] > 0.5) & (y_outliers == 0), :
+    ]
+
+    outliers_incorrect_naive = target_df_outliers.loc[
+        (outlier_probabilities[:, 1] < 0.5) & (y_outliers == 1), :
+    ]
+
+    outliers_incorrect_dd = target_df_outliers.loc[
+        (outlier_probabilities[:, 0] < 0.5) & (y_outliers == 0), :
+    ]
+
+    print(
+        len(outliers_correct_naive),
+        len(outliers_correct_dd),
+        len(outliers_incorrect_naive),
+        len(outliers_incorrect_dd),
+    )
+
+    fig, ax = plt.subplots(2, 2, figsize=(20, 12), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(2) for j in range(2)]
+    count = 0
+    titles = ["Correct DD", "Correct Naive", "Incorrect DD", "Incorrect Naive"]
+    for df in [
+        outliers_correct_dd,
+        outliers_correct_naive,
+        outliers_incorrect_dd,
+        outliers_incorrect_naive,
+    ]:
+
+        target_df_tmp = target_df[target_df["Type"] == count % 2]
+
+        norm_df = clean_data.normalize_data(
+            target_df_tmp.drop(columns=["Type"]),
+            df,
+            min_max=min_max_scale,
+        )[1]
+        norm_df = norm_df.transpose()
+        sns.heatmap(
+            norm_df,
+            cmap="rocket_r",
+            annot=True,
+            vmin=3,
+            vmax=7,
+            ax=axes[count],
+            annot_kws={"fontsize": 6},
+            mask=norm_df < 3,
+            linecolor="gray",
+            linewidths=0.05,
+        )
+        axes[count].set_title(titles[count], fontsize=6)
+        # axes[count].tick_params(axis="x", which="major", labelsize=4)
+        count += 1
+    add_fig_labels(axes)
+    fig.savefig("../data/neural_net/outliers_heatmaps.pdf")
+    plt.close()
+    run_cmd("open ../data/neural_net/outliers_heatmaps.pdf")
 
     fig, ax = plt.subplots(3, 2, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(3) for j in range(2)]
