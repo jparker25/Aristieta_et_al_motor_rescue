@@ -16,6 +16,7 @@ from sklearn.inspection import permutation_importance
 import sys
 import scipy.stats
 import matplotlib as mpl
+import pickle
 
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
@@ -271,19 +272,363 @@ def feature_importance(
         run_cmd("open ../data/neural_net/feature_removal_performance.pdf")
 
 
+def feature_importance_clustered(
+    target_df,
+    feature_array,
+    outlier_dict,
+    train_amount,
+    seeds=np.arange(10),
+    show=False,
+):
+    target_df = clean_data.remove_outliers_by_group_zscore_independent(
+        target_df[target_df["Type"] == 1],
+        target_df[target_df["Type"] == 0],
+        outlier_dict,
+    )
+
+    feature_df = target_df.iloc[:, feature_array]
+
+    train_test_accuracy = np.zeros((len(feature_array) + 1, 2))
+
+    xlabels_cluster = [
+        "None",
+        "Cluster I",
+        "Cluster II",
+        "Cluster I + II",
+        "Num Bursts",
+        "Cluster III",
+        "All - Cluster I + II",
+    ]
+
+    cluster_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
+    cluster_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
+    cluster_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
+    train_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
+    train_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
+    test_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
+    test_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
+    train_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
+    test_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
+    print(feature_df.columns)
+
+    cluster_I = ["Delta Power"]
+    cluster_II = [
+        "Percent of Spikes in Bursts",
+        "Percent Time Bursting",
+        "CV",
+        "Burst Firing Rate Increase",
+    ]
+    cluster_III = ["FR", "Avg Burst Firing Rate", "Non Bursting Firing Rate"]
+    cluster_I_II = [
+        "Delta Power",
+        "Percent of Spikes in Bursts",
+        "Percent Time Bursting",
+        "CV",
+        "Burst Firing Rate Increase",
+    ]
+    num_bursts = [
+        "Num Bursts",
+    ]
+    except_I_II = [
+        "FR",
+        "Avg Burst Firing Rate",
+        "Non Bursting Firing Rate",
+        "Num Bursts",
+        "Beta Power",
+        "Avg Interburst Interval",
+        "Avg Burst Duration",
+    ]
+
+    cluster_runs = [
+        cluster_I,
+        cluster_II,
+        cluster_I_II,
+        num_bursts,
+        cluster_III,
+        except_I_II,
+    ]
+
+    run = 0
+    for i in seeds:
+
+        np.random.seed(i)
+        X_train, X_test, y_train, y_test = clean_data.split_data(
+            feature_df, target_df, train_amount, seed=i
+        )
+
+        X_train_norm, X_test_norm = clean_data.normalize_data(
+            X_train, X_test, min_max=False
+        )
+
+        _, all_norm = clean_data.normalize_data(X_train, feature_df, min_max=False)
+
+        clf = MLPClassifier(
+            hidden_layer_sizes=(200, 100),
+            activation="relu",
+            solver="adam",
+            random_state=i,
+            max_iter=50000,
+            alpha=1e-5,
+            max_fun=50000,
+            learning_rate_init=1e-2,
+            learning_rate="adaptive",
+            epsilon=1e-8,
+            shuffle=True,
+            early_stopping=False,
+            verbose=False,
+            tol=1e-4,
+            n_iter_no_change=10,
+        )
+
+        clf.fit(X_train_norm, y_train)
+        cluster_acc_scores[run, i] = accuracy_score(
+            target_df["Type"], clf.predict(all_norm)
+        )
+
+        train_acc_scores[run, i] = accuracy_score(y_train, clf.predict(X_train_norm))
+
+        test_acc_scores[run, i] = accuracy_score(y_test, clf.predict(X_test_norm))
+
+        train_probs = clf.predict_proba(X_train_norm)
+
+        train_probs_dd[run, i] = np.mean(train_probs[y_train == 0, 0])
+        train_probs_naive[run, i] = np.mean(train_probs[y_train == 1, 0])
+
+        test_probs = clf.predict_proba(X_test_norm)
+
+        test_probs_dd[run, i] = np.mean(test_probs[y_test == 0, 0])
+        test_probs_naive[run, i] = np.mean(test_probs[y_test == 1, 0])
+
+        all_probs = clf.predict_proba(all_norm)
+
+        cluster_probs_dd[run, i] = np.mean(all_probs[target_df["Type"] == 0, 0])
+        cluster_probs_naive[run, i] = np.mean(all_probs[target_df["Type"] == 1, 0])
+
+    run += 1
+
+    features = feature_df.columns
+
+    for cr in cluster_runs:
+        print(xlabels_cluster[run])
+        # cr_locs = [feature_df.columns.get_loc(x) for x in cr]
+        cols = []
+        for i in range(len(features)):
+            if features[i] not in cr:
+                cols.append(i)
+        print(cols)
+
+        tmp_feature_df = pd.concat(
+            [
+                target_df.iloc[:, cols],  # target_df.iloc[:, [entry]],  #
+            ],
+        )
+
+        tmp_target_df = pd.concat(
+            [target_df],
+        )
+
+        print(tmp_feature_df.columns)
+        print()
+
+        for i in seeds:
+            np.random.seed(i)
+            X_train, X_test, y_train, y_test = clean_data.split_data(
+                tmp_feature_df, tmp_target_df, train_amount, seed=i
+            )
+
+            X_train_norm, X_test_norm = clean_data.normalize_data(
+                X_train, X_test, min_max=False
+            )
+
+            _, all_norm = clean_data.normalize_data(
+                X_train, tmp_feature_df, min_max=False
+            )
+
+            clf = MLPClassifier(
+                hidden_layer_sizes=(200, 100),
+                activation="relu",
+                solver="adam",
+                random_state=i,
+                max_iter=50000,
+                alpha=1e-5,
+                max_fun=50000,
+                learning_rate_init=1e-2,
+                learning_rate="adaptive",
+                epsilon=1e-8,
+                shuffle=True,
+                early_stopping=False,
+                verbose=False,
+                tol=1e-4,
+                n_iter_no_change=10,
+            )
+
+            clf.fit(X_train_norm, y_train)
+
+            cluster_acc_scores[run, i] = accuracy_score(
+                tmp_target_df["Type"], clf.predict(all_norm)
+            )
+
+            train_acc_scores[run, i] = accuracy_score(
+                y_train, clf.predict(X_train_norm)
+            )
+
+            test_acc_scores[run, i] = accuracy_score(y_test, clf.predict(X_test_norm))
+
+            train_probs = clf.predict_proba(X_train_norm)
+
+            train_probs_dd[run, i] = np.mean(train_probs[y_train == 0, 0])
+            train_probs_naive[run, i] = np.mean(train_probs[y_train == 1, 0])
+
+            test_probs = clf.predict_proba(X_test_norm)
+
+            test_probs_dd[run, i] = np.mean(test_probs[y_test == 0, 0])
+            test_probs_naive[run, i] = np.mean(test_probs[y_test == 1, 0])
+
+            all_probs = clf.predict_proba(all_norm)
+
+            cluster_probs_dd[run, i] = np.mean(all_probs[target_df["Type"] == 0, 0])
+            cluster_probs_naive[run, i] = np.mean(all_probs[target_df["Type"] == 1, 0])
+        run += 1
+
+    fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax3.errorbar(
+        np.arange(cluster_acc_scores.shape[0]),
+        np.mean(cluster_acc_scores, axis=1),
+        yerr=scipy.stats.sem(cluster_acc_scores, axis=1),
+        color="b",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="clusters",
+    )
+    """ax3.errorbar(
+        np.arange(train_acc_scores.shape[0]),
+        np.mean(train_acc_scores, axis=1),
+        yerr=scipy.stats.sem(train_acc_scores, axis=1),
+        color="k",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Train",
+    )
+    ax3.errorbar(
+        np.arange(test_acc_scores.shape[0]),
+        np.mean(test_acc_scores, axis=1),
+        yerr=scipy.stats.sem(test_acc_scores, axis=1),
+        color="gray",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Test",
+    )"""
+    ax3.set_xticks(np.arange(len(xlabels_cluster)))
+    ax3.set_xticklabels(xlabels_cluster, rotation=90, fontsize=6)
+    ax3.grid(visible=True, which="both")
+    ax3.set_ylabel("Accuracy")
+    ax3.set_xlabel("Features Removed")
+    makeNice(ax3)
+    fig3.savefig(
+        f"../data/neural_net/acc_train_test_removal_clustered.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax3.errorbar(
+        np.arange(cluster_probs_dd.shape[0]),
+        np.mean(cluster_probs_dd, axis=1),
+        yerr=scipy.stats.sem(cluster_probs_dd, axis=1),
+        color="r",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="clusters",
+    )
+    ax3.errorbar(
+        np.arange(cluster_probs_naive.shape[0]),
+        np.mean(cluster_probs_naive, axis=1),
+        yerr=scipy.stats.sem(cluster_probs_naive, axis=1),
+        color="gray",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="clusters",
+    )
+    """ax3.errorbar(
+        np.arange(test_probs_dd.shape[0]),
+        np.mean(test_probs_dd, axis=1),
+        yerr=scipy.stats.sem(test_probs_dd, axis=1),
+        color="k",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Train",
+    )
+    ax3.errorbar(
+        np.arange(test_probs_naive.shape[0]),
+        np.mean(test_probs_naive, axis=1),
+        yerr=scipy.stats.sem(test_probs_naive, axis=1),
+        color="gray",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Test",
+    )"""
+    ax3.set_xticks(np.arange(len(xlabels_cluster)))
+    ax3.set_xticklabels(xlabels_cluster, rotation=90, fontsize=6)
+    ax3.grid(visible=True, which="both")
+    ax3.set_ylabel("Confidence")
+    ax3.set_xlabel("Features Removed")
+    makeNice(ax3)
+    fig3.savefig(
+        f"../data/neural_net/probs_train_test_removal_clustered.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+
 def feature_importance_selected(
     target_df,
     feature_array,
+    outlier_dict,
     train_amount,
-    seeds=10,
+    seeds=np.arange(10),
     show=False,
 ):
-    seeds = np.arange(seeds)
+
+    target_df = clean_data.remove_outliers_by_group_zscore_independent(
+        target_df[target_df["Type"] == 1],
+        target_df[target_df["Type"] == 0],
+        outlier_dict,
+    )
+
     feature_df = target_df.iloc[:, feature_array]
+
     train_test_accuracy = np.zeros((len(feature_array) + 1, 2))
 
     xlabels = list(target_df.columns[feature_array])
     xlabels.insert(0, "All")
+
+    xlabels_cluster = [
+        "None",
+        "Cluster I",
+        "Cluster II",
+        "Cluster I + II",
+        "Num Bursts",
+        "Cluster III",
+        "All - Cluster I + II",
+    ]
+
+    cluster_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
+    cluster_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
+    cluster_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
 
     acc_scores = np.zeros((len(feature_array) + 1, len(seeds)))
     acc_scores_test = np.zeros((len(feature_array) + 1, len(seeds)))
@@ -377,7 +722,7 @@ def feature_importance_selected(
 
             probs = clf.predict_proba(X_test_norm)
 
-            probs_scores_naive[feature_count, i] = np.mean(probs[y_test == 1, 1])
+            probs_scores_naive[feature_count, i] = np.mean(probs[y_test == 1, 0])
             probs_scores_dd[feature_count, i] = np.mean(probs[y_test == 0, 0])
 
         feature_count += 1
@@ -422,7 +767,7 @@ def feature_importance_selected(
 
         probs = clf.predict_proba(X_test_norm)
 
-        probs_scores_naive[0, i] = np.mean(probs[y_test == 1, 1])
+        probs_scores_naive[0, i] = np.mean(probs[y_test == 1, 0])
         probs_scores_dd[0, i] = np.mean(probs[y_test == 0, 0])
 
     for i in range(1, acc_scores.shape[0]):
@@ -456,8 +801,121 @@ def feature_importance_selected(
     print(xlabels)
     # sys.exit()
 
+    feature_df = feature_df[
+        [
+            "Delta Power",
+            "Percent of Spikes in Bursts",
+            "Percent Time Bursting",
+            "CV",
+            "Burst Firing Rate Increase",
+            "Num Bursts",
+            "FR",
+            "Avg Burst Firing Rate",
+            "Non Bursting Firing Rate",
+            "Beta Power",
+            "Avg Interburst Interval",
+            "Avg Burst Duration",
+        ]
+    ]
     corr_mat = feature_df.corr()
     # corr_mat = corr_mat.iloc[ditches_indices, :]
+
+    fig2, ax2 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    sns.heatmap(
+        corr_mat,  # feature_df.corr(),
+        cmap="coolwarm",
+        ax=ax2,
+        vmin=-1,
+        vmax=1,
+        fmt=".2f",
+        annot=False,
+        annot_kws={"fontsize": 4},
+        # mask=np.triu(feature_df.corr()),
+        # cbar_kws={"shrink": 0.5},
+        cbar=True,
+        cbar_kws={"orientation": "vertical"},
+    )
+    makeNice(ax2)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+    ax2.set_xticks([])
+    ax2.set_yticks([])
+
+    fig2.savefig(
+        f"../data/neural_net/corr_mat_single_plot.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax3.errorbar(
+        np.arange(train_test_accuracy[:, 0].shape[0]),
+        np.mean(acc_scores, axis=1),
+        yerr=scipy.stats.sem(acc_scores, axis=1),
+        color="k",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Train",
+    )
+    ax3.errorbar(
+        np.arange(train_test_accuracy[:, 0].shape[0]),
+        np.mean(acc_scores_test, axis=1),
+        yerr=scipy.stats.sem(acc_scores_test, axis=1),
+        color="gray",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Test",
+    )
+    ax3.set_xticks(np.arange(0, len(feature_array) + 1))
+    ax3.set_xticklabels(xlabels, rotation=90, fontsize=6)
+    ax3.grid(visible=True, which="both")
+    ax3.set_ylabel("Accuracy")
+    ax3.set_xlabel("Features Removed")
+    makeNice(ax3)
+    fig3.savefig(
+        f"../data/neural_net/acc_train_test_removal.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    fig4, ax4 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax4.errorbar(
+        np.arange(train_test_accuracy[:, 0].shape[0]),
+        np.mean(probs_scores_naive, axis=1),
+        yerr=scipy.stats.sem(probs_scores_naive, axis=1),
+        color="r",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="Naive",
+    )
+    ax4.errorbar(
+        np.arange(train_test_accuracy[:, 0].shape[0]),
+        np.mean(probs_scores_dd, axis=1),
+        yerr=scipy.stats.sem(probs_scores_dd, axis=1),
+        color="b",
+        capsize=4,
+        marker="o",
+        lw=0.5,
+        markersize=4,
+        label="DD",
+    )
+    ax4.set_xticks(np.arange(0, len(feature_array) + 1))
+    ax4.set_xticklabels(xlabels, rotation=90, fontsize=6)
+    ax4.grid(visible=True, which="both")
+    ax4.set_ylabel("Confidence")
+    ax4.set_xlabel("Features Removed")
+    makeNice(ax4)
+    fig4.savefig(
+        f"../data/neural_net/prob_removal.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
 
     fig, ax = plt.subplots(2, 2, figsize=(12, 8), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(2) for j in range(2)]
@@ -729,6 +1187,9 @@ def predict_motor_rescue(
         # Train network
         clf.fit(X_train_norm, y_train)
 
+        with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "wb") as f:
+            pickle.dump(clf, f)
+
         # Get network statistics
         predicts_train = clf.predict(X_train_norm)
         predicts_test = clf.predict(X_test_norm)
@@ -962,13 +1423,109 @@ def predict_motor_rescue(
             jaws_npas_pre_post_probs[i][:, :, 1], axis=0
         )
 
+    fig, ax = plt.subplots(2, 2, figsize=(8, 6), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(2) for j in range(2)]
+    count = 0
+    dd_prob_splits = [[0, 0.50], [0.50, 0.67], [0.67, 0.83], [0.83, 1]]
+    dd_colors = ["gray", "lightblue", "b", "darkblue"]
+    jaws_probs_all = np.zeros((len(jaws_npas_pre_post), 4))
+    npas_probs_all = np.zeros((len(jaws_npas_pre_post), 4))
+    for x in jaws_npas_pre_post:
+        jaws_probs = np.zeros(4)  # 50-70, 70-90, 90+, Naive
+        npas_probs = np.zeros(4)  # 50-70, 70-90, 90+, Naive
+        jaws_x = x[x["mouse"] == "JAWS"]
+        npas_x = x[x["mouse"] == "NPAS"]
+        for i in range(4):
+            jaws_probs[i] = len(
+                jaws_x[
+                    (jaws_x["DD Probability"] > dd_prob_splits[i][0])
+                    & (jaws_x["DD Probability"] <= dd_prob_splits[i][1])
+                ]
+            )
+
+            npas_probs[i] = len(
+                npas_x[
+                    (npas_x["DD Probability"] > dd_prob_splits[i][0])
+                    & (npas_x["DD Probability"] <= dd_prob_splits[i][1])
+                ]
+            )
+        jaws_probs = jaws_probs / np.sum(jaws_probs)
+        npas_probs = npas_probs / np.sum(npas_probs)
+
+        print("Npas:\t", npas_probs)
+        print("Jaws:\t", jaws_probs)
+
+        axes[0].scatter(
+            np.random.rand(len(jaws_x)) * 0.25 + 0.25 + count,
+            jaws_x["DD Probability"],
+            color="b",
+            s=2,
+        )
+        axes[1].scatter(
+            np.random.rand(len(npas_x)) * 0.25 + 0.25 + count,
+            npas_x["DD Probability"],
+            color="r",
+            s=2,
+        )
+
+        jaws_probs_all[count] = jaws_probs
+        npas_probs_all[count] = npas_probs
+
+        for i in range(4):
+            axes[2].bar(
+                count, jaws_probs[i], bottom=np.sum(jaws_probs[0:i]), color=dd_colors[i]
+            )
+            axes[3].bar(
+                count, npas_probs[i], bottom=np.sum(npas_probs[0:i]), color=dd_colors[i]
+            )
+        count += 1
+    for i in [2, 3]:
+        axes[i].set_xticks(np.arange(5))
+        axes[i].set_xticklabels(
+            ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            fontsize=6,
+            rotation=15,
+        )
+        axes[i].set_ylabel(f"{'JAWS' if i == 2 else 'NPAS'} DD Proportions")
+    for i in range(2):
+        axes[i].hlines(0.5, 0, 5, ls="dashed", lw=0.5, color="k")
+        axes[i].set_xticks(np.arange(0.375, 5.25, 1))
+        axes[i].set_xticklabels(
+            ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            fontsize=6,
+            rotation=15,
+        )
+        axes[i].set_ylabel(f"{'JAWS' if i == 0 else 'NPAS'} DD Probability")
+    makeNice(axes)
+    add_fig_labels(axes)
+    fig.savefig("../data/neural_net/jaws_npas_summary.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open ../data/neural_net/jaws_npas_summary.pdf")
+
+    np.savetxt(
+        "../data/neural_net/jaws_pre_post_summary.csv",
+        jaws_probs_all,
+        newline="\n",
+        delimiter=",",
+        fmt="%f",
+        header="naive, weak DD, DD, strong DD",
+    )
+    np.savetxt(
+        "../data/neural_net/npas_pre_post_summary.csv",
+        npas_probs_all,
+        newline="\n",
+        delimiter=",",
+        fmt="%f",
+        header="naive, weak DD, DD, strong DD",
+    )
+
     all_pre_post = pd.concat(jaws_npas_pre_post)
     all_pre_post.to_csv("../data/neural_net/jaws_npas_pre_post.csv")
     print(np.mean(accuracies, axis=0))
 
     fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(4) for j in range(3)]
-    count = 03
+    count = 0
     for col in feature_df.columns:
         bins = np.histogram_bin_edges(target_df_outliers_removed[col], bins=nbins)
         feat_mean_dd = np.mean(target_df[target_df["Type"] == 0][col])
@@ -1053,13 +1610,6 @@ def predict_motor_rescue(
         (outlier_probabilities[:, 0] < 0.5) & (y_outliers == 0), :
     ]
 
-    print(
-        len(outliers_correct_naive),
-        len(outliers_correct_dd),
-        len(outliers_incorrect_naive),
-        len(outliers_incorrect_dd),
-    )
-
     fig, ax = plt.subplots(2, 2, figsize=(20, 12), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(2) for j in range(2)]
     count = 0
@@ -1102,6 +1652,9 @@ def predict_motor_rescue(
     fig, ax = plt.subplots(3, 2, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(3) for j in range(2)]
 
+    fig2, ax2 = plt.subplots(1, 1, figsize=(3, 2), dpi=300, tight_layout=True)
+    fig3, ax3 = plt.subplots(1, 1, figsize=(3, 2), dpi=300, tight_layout=True)
+
     disp = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=[0, 1])
 
     disp.plot(ax=axes[0], im_kw={"aspect": "auto"}, values_format=".0f")
@@ -1110,12 +1663,50 @@ def predict_motor_rescue(
         fontsize=10,
     )
 
+    disp.plot(ax=ax2, im_kw={"aspect": "auto"}, values_format=".0f")
+    ax2.set_title(
+        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f}",
+        fontsize=8,
+    )
+    ax2.set_xticks([0, 1])
+    ax2.set_xticklabels(["Depleted", "Control"])
+    ax2.set_yticks([0, 1])
+    ax2.set_yticklabels(["Depleted", "Control"])
+    makeNice(ax2)
+    for i in ["left", "right", "top", "bottom"]:
+        ax2.spines[i].set_visible(True)
+    fig2.savefig(
+        f"../data/neural_net/conf_mat_train.pdf",
+        transparent=True,
+        bbox_inches="tight",
+    )
+    plt.close()
+
     disp = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=[0, 1])
     disp.plot(ax=axes[1], im_kw={"aspect": "auto"}, values_format=".0f")
     axes[1].set_title(
         f"Accuracy: {np.mean(accuracies[:,1],axis=0):.02f}\nPrecision: {np.mean(precisions[:,3]):.02f}, {np.mean(precisions[:,2]):.02f}\nRecall: {np.mean(recalls[:,3]):.02f}, {np.mean(recalls[:,2]):.02f}",
-        fontsize=10,
     )
+
+    disp.plot(ax=ax3, im_kw={"aspect": "auto"}, values_format=".0f")
+    ax3.set_title(
+        f"Accuracy: {np.mean(accuracies[:,1],axis=0):.02f}",
+        fontsize=8,
+    )
+    ax3.set_xticks([0, 1])
+    ax3.set_xticklabels(["Depleted", "Control"])
+    ax3.set_yticks([0, 1])
+    ax3.set_yticklabels(["Depleted", "Control"])
+    makeNice(ax3)
+    for i in ["left", "right", "top", "bottom"]:
+        ax3.spines[i].set_visible(True)
+
+    fig3.savefig(
+        f"../data/neural_net/conf_mat_test.pdf",
+        transparent=True,
+        bbox_inches="tight",
+    )
+    plt.close()
 
     axes[2].errorbar(
         np.arange(len(jaws_npas_pre_post)),
@@ -1454,9 +2045,9 @@ def predict_motor_rescue(
 
     for i in range(2):
         axes[i].set_xticks([0, 1])
-        axes[i].set_xticklabels(["DD", "Naive"])
+        axes[i].set_xticklabels(["Depleted", "Control"])
         axes[i].set_yticks([0, 1])
-        axes[i].set_yticklabels(["DD", "Naive"])
+        axes[i].set_yticklabels(["Depleted", "Control"])
 
     for i in [2, 3, 4, 5]:
         axes[i].set_ylabel("Predicted Naive %" if i != 5 else "Naive Probability")
@@ -1522,6 +2113,8 @@ def predict_motor_rescue(
     plt.close()
     if show:
         run_cmd("open ../data/neural_net/motor_rescue_conf_mat.pdf")
+        run_cmd("open ../data/neural_net/conf_mat_train.pdf")
+        run_cmd("open ../data/neural_net/conf_mat_test.pdf")
 
 
 def predict_motor_rescue_archive(

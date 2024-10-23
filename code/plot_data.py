@@ -14,6 +14,7 @@ from matplotlib import gridspec
 from helpers import *
 import scipy.stats
 import matplotlib as mpl
+import clean_data
 
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
@@ -931,6 +932,138 @@ def plot_ephys_pre_post(pre, post, name):
     makeNice(axes)
     fig.savefig(f"../data/ephys_pre_post_{name}.pdf")
     plt.close()
+
+
+def plot_feature_histograms_separate(df, outlier_dict):
+    dd_color = "r"
+    naive_color = "gray"
+    df = clean_data.remove_outliers_by_group_zscore_independent(
+        df[df["Type"] == 1],
+        df[df["Type"] == 0],
+        outlier_dict,
+    )
+    i = 0
+    for col in df.columns[0:12]:
+        if col != "Type" and col != "T" and "Osc" not in col and "_z" not in col:
+            fig, ax = plt.subplots(1, 1, figsize=(3, 2), dpi=300, tight_layout=True)
+            fig2, ax2 = plt.subplots(1, 1, figsize=(3, 2), dpi=300, tight_layout=True)
+            bins = np.histogram_bin_edges(df[col], bins=20)
+            sns.ecdfplot(
+                df[df["Type"] == 0],
+                x=col,
+                ax=ax2,
+                legend=False,
+                stat="proportion",
+                color=dd_color,
+            )
+            sns.ecdfplot(
+                df[df["Type"] == 1],
+                x=col,
+                ax=ax2,
+                legend=False,
+                stat="proportion",
+                color=naive_color,
+            )
+            sns.histplot(
+                df[df["Type"] == 1],
+                x=col,
+                ax=ax,
+                legend=False if i != 0 else True,
+                kde=True,
+                stat="probability",
+                edgecolor="w",
+                linewidth=0.25,
+                color=naive_color,
+                bins=bins,
+                label="Naive",
+                line_kws={"lw": 0.5},
+            )
+            sns.histplot(
+                df[df["Type"] == 0],
+                x=col,
+                ax=ax,
+                legend=False if i != 0 else True,
+                kde=True,
+                stat="probability",
+                edgecolor="w",
+                linewidth=0.25,
+                color=dd_color,
+                bins=bins,
+                label="DD",
+                line_kws={"lw": 0.5},
+            )
+            dd_col = df[df["Type"] == 0][[col]]
+            naive_col = df[df["Type"] == 1][[col]]
+            ylims = ax.get_ylim()
+            xlims = ax.get_xlim()
+            ax.vlines(
+                np.mean(dd_col),
+                ylims[0],
+                ylims[1],
+                color=dd_color,
+                linestyle="dashed",
+                lw=0.5,
+            )
+            ax.vlines(
+                np.mean(naive_col),
+                ylims[0],
+                ylims[1],
+                color=naive_color,
+                linestyle="dashed",
+                lw=0.5,
+            )
+            ax2.vlines(
+                np.mean(dd_col), 0, 1, color=dd_color, linestyle="dashed", lw=0.5
+            )
+            ax2.vlines(
+                np.mean(naive_col), 0, 1, color=naive_color, linestyle="dashed", lw=0.5
+            )
+            ax2.vlines(
+                np.median(dd_col), 0, 1, color=dd_color, linestyle="dotted", lw=0.5
+            )
+            ax2.vlines(
+                np.median(naive_col),
+                0,
+                1,
+                color=naive_color,
+                linestyle="dotted",
+                lw=0.5,
+            )
+            ax.vlines(
+                np.mean(df[col]),
+                ylims[0],
+                ylims[1],
+                color="k",
+                linestyle="dashed",
+                lw=0.5,
+            )
+            ks_pval = ks_2samp(dd_col, naive_col).pvalue
+            plot_bracket(
+                ax,
+                xlims[0] + (xlims[1] - xlims[0]) * 0.25,
+                xlims[1] - (xlims[1] - xlims[0]) * 0.25,
+                ylims[0] + 1.15 * (ylims[1] - ylims[0]),
+                ylims[0] + 1.18 * (ylims[1] - ylims[0]),
+                f"KS $p{'*' if ks_pval[0] < 0.05 else ''}=${ks_pval[0]:.3f}",
+            )
+
+            ttest_pval = stats.ttest_ind(dd_col, naive_col).pvalue
+            plot_bracket(
+                ax,
+                np.mean(naive_col),
+                np.mean(dd_col),
+                ylims[1],
+                ylims[0] + 1.03 * (ylims[1] - ylims[0]),
+                f"T-test $p{'*' if ttest_pval[0] < 0.05 else ''}=${ttest_pval[0]:.3f}",
+            )
+            i += 1
+            makeNice(ax)
+            fig.savefig(f"../data/features_{col}.pdf")
+            plt.close()
+
+            makeNice(ax2)
+            fig2.savefig(f"../data/features_cdf_{col}.pdf")
+            plt.close()
 
 
 def plot_feature_histograms(df):

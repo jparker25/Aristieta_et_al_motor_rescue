@@ -15,6 +15,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.neural_network import MLPClassifier
 from scipy import stats
 from scipy.stats import ks_2samp
+import pickle
 
 import os, sys
 
@@ -32,6 +33,136 @@ def apply_pca(norm_df, pca):
             for k in range(pca.n_components_)
         ]
     return pca_applied
+
+
+def run_pca_for_figures(
+    target_df, feature_array, outlier_dict, seeds=np.arange(5), train_amount=0.8
+):
+
+    target_df_outliers_removed = clean_data.remove_outliers_by_group_zscore_independent(
+        target_df[target_df["Type"] == 1],
+        target_df[target_df["Type"] == 0],
+        outlier_dict,
+    )
+
+    feature_df = target_df_outliers_removed.iloc[:, feature_array]
+    types = target_df_outliers_removed["Type"].values
+
+    feature_df_norm, _ = clean_data.normalize_data(
+        feature_df, feature_df, min_max=False
+    )
+    print(feature_df_norm.shape)
+
+    pca = PCA(n_components=len(feature_array))
+    X_pca = pca.fit_transform(feature_df_norm)
+
+    c = ["r" if types[i] == 0 else "gray" for i in range(len(types))]
+    X_pca_dd = X_pca[types == 0, :]
+    X_pca_naive = X_pca[types == 1, :]
+
+    dd_centroid = KMeans(n_clusters=1, random_state=0, n_init="auto").fit(X_pca_dd)
+    naive_centroid = KMeans(n_clusters=1, random_state=0, n_init="auto").fit(
+        X_pca_naive
+    )
+
+    fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax.scatter(X_pca[:, 0], X_pca[:, 1], c=c, s=4)
+    ax.scatter(
+        dd_centroid.cluster_centers_[0, 0],
+        dd_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="darkred",
+        edgecolors="w",
+    )
+    ax.scatter(
+        naive_centroid.cluster_centers_[0, 0],
+        naive_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="black",
+        edgecolors="w",
+    )
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    makeNice(ax)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.savefig("../data/pca/all_pre_pca.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open ../data/pca/all_pre_pca.pdf")
+
+    centroid_match_train = np.zeros(len(X_pca))
+    for i in range(len(X_pca)):
+        dd_dist = np.linalg.norm(X_pca[i, :] - dd_centroid.cluster_centers_)
+        naive_dist = np.linalg.norm(X_pca[i, :] - naive_centroid.cluster_centers_)
+        if naive_dist < dd_dist:
+            centroid_match_train[i] = 1
+
+    fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax.scatter(
+        X_pca[:, 0],
+        X_pca[:, 1],
+        c=["r" if x == 0 else "gray" for x in centroid_match_train],
+        s=4,
+    )
+    ax.scatter(
+        dd_centroid.cluster_centers_[0, 0],
+        dd_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="darkred",
+        edgecolors="w",
+    )
+    ax.scatter(
+        naive_centroid.cluster_centers_[0, 0],
+        naive_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="black",
+        edgecolors="w",
+    )
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    makeNice(ax)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.savefig("../data/pca/all_pca_clustered.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open ../data/pca/all_pca_clustered.pdf")
+
+    predicts_prob = np.zeros((len(feature_df_norm), 2))
+    for seed in seeds:
+        np.random.seed(seed)
+        with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "rb") as f:
+            clf = pickle.load(f)
+
+        predicts_prob += clf.predict_proba(feature_df_norm) / len(seeds)
+    fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    ax.scatter(
+        X_pca[:, 0],
+        X_pca[:, 1],
+        c=["r" if x[0] >= 0.5 else "gray" for x in predicts_prob],
+        s=4,
+    )
+    ax.scatter(
+        dd_centroid.cluster_centers_[0, 0],
+        dd_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="darkred",
+        edgecolors="w",
+    )
+    ax.scatter(
+        naive_centroid.cluster_centers_[0, 0],
+        naive_centroid.cluster_centers_[0, 1],
+        marker="X",
+        color="black",
+        edgecolors="w",
+    )
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    makeNice(ax)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.savefig("../data/pca/all_mlp_predictions.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open ../data/pca/all_mlp_predictions.pdf")
 
 
 def pca_on_df(

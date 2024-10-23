@@ -17,6 +17,9 @@ import clean_data
 import plot_data
 
 renewal_power = False
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Arial"]
+plt.rcParams["axes.labelsize"] = 8
 
 
 def get_naive_dd_training_data_set():
@@ -178,6 +181,18 @@ def get_jaws_npas_data_set():
     return pd.concat(dataframes, ignore_index=True)
 
 
+def get_jaws_npas_tracked_data():
+    source_path = "../data/training"
+    dataframes = []
+    paths = [
+        "jaws_neurons/pre_opto",
+        "jaws_neurons/post_opto",
+        "npas_neurons/pre_opto",
+        "npas_neurons/post_opto",
+    ]
+    return 0
+
+
 def generate_post_dataframes(dataframe, times, time_chunks, is_medial):
     dataframe["Post-Time"] = times
     dataframe["Medial"] = is_medial
@@ -232,6 +247,10 @@ jaws_npas_pre.insert(0, "Type", np.zeros(len(jaws_npas_pre)))
 
 combined_df = pd.concat([training_df, jaws_npas_pre], ignore_index=True)
 
+types = combined_df["Type"]
+combined_df = combined_df.drop(columns="Type")
+combined_df["Type"] = types
+
 ### REMOVE OUTLIERS ###
 zscore_threshold = 3
 feature_outlier_strength = {
@@ -273,23 +292,56 @@ use_feature = {
     "name": False,
 }
 
+plot_data.plot_feature_histograms_separate(combined_df, feature_outlier_strength)
+
+
 ### GATHER THE FEATURES IN AN ARRAY ###
 feature_array = []
 count = 0
-for col in df.columns:
+for col in combined_df.columns:
     if use_feature[col]:
         feature_array.append(count)
     count += 1
 
-run_neural_net.predict_motor_rescue(
-    combined_df,
-    feature_array,
-    feature_outlier_strength,
-    jaws_npas_pre_post,
-    train_amount=0.8,
-    seeds=np.arange(15),
-    show=True,
-    test_outliers=False,
-    nonlinear_transforms=False,
-    min_max_scale=False,
-)
+mlp = False
+pca = False
+feature_removal = True
+num_seeds = 15
+training_split = 0.8
+
+if mlp:
+    run_neural_net.predict_motor_rescue(
+        combined_df,
+        feature_array,
+        feature_outlier_strength,
+        jaws_npas_pre_post,
+        train_amount=training_split,
+        seeds=np.arange(num_seeds),
+        show=True,
+        test_outliers=False,
+        nonlinear_transforms=False,
+        min_max_scale=False,
+    )
+
+if feature_removal:
+    run_neural_net.feature_importance_clustered(
+        combined_df,
+        feature_array,
+        feature_outlier_strength,
+        train_amount=training_split,
+        seeds=np.arange(num_seeds),
+        show=False,
+    )
+
+    sys.exit()
+    run_neural_net.feature_importance_selected(
+        combined_df,
+        feature_array,
+        feature_outlier_strength,
+        train_amount=training_split,
+        seeds=np.arange(num_seeds),
+        show=False,
+    )
+
+if pca:
+    run_pca.run_pca_for_figures(combined_df, feature_array, feature_outlier_strength)

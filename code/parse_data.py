@@ -482,5 +482,5 @@ def create_pulse_cont_training_data(fixed_length):
 
 
 # Create data
-create_ephys_training_data(training_fixed_length)
-create_pulse_cont_training_data(training_fixed_length)
+# create_ephys_training_data(training_fixed_length)
+# create_pulse_cont_training_data(training_fixed_length)

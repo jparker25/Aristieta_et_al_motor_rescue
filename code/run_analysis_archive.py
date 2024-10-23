@@ -314,9 +314,6 @@ combined_dd_df = df[df["Type"] == 0]
 
 df = pd.concat([combined_naive_df, combined_dd_df])
 
-print(df)
-
-
 ### REMOVE OUTLIERS ###
 zscore_threshold = 3
 feature_outlier_strength = {
@@ -392,7 +389,7 @@ for col in df.columns:
     count += 1
 
 ### SELECT WHICH ANALYSIS TO RUN ###
-plot_pca = True
+plot_pca = False
 plot_logistic = False
 show = False
 
@@ -400,13 +397,18 @@ train_amount = 0.8
 grid_search = False
 
 motor_rescue_predict = False
-motor_rescue_feature_importance = False
+motor_rescue_feature_importance = True
 motor_rescue_detec_osc = False
 
 
 if motor_rescue_feature_importance:
     run_neural_net.feature_importance_selected(
-        df, feature_array, train_amount, seeds=10, show=True
+        df,
+        feature_array,
+        feature_outlier_strength,
+        train_amount,
+        seeds=np.arange(10),
+        show=True,
     )
 
 if motor_rescue_predict:

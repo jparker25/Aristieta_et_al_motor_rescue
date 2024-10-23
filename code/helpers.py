@@ -11,7 +11,7 @@ def run_cmd(str, print_out=True):
         print()
 
 
-def makeNice(axes, labelsize=8, lw=1.5, width=0):
+def makeNice(axes, labelsize=8, lw=0.5, width=0.5):
     if type(axes) == list:
         for ax in axes:
             for i in ["left", "right", "top", "bottom"]:
@@ -32,7 +32,7 @@ def makeNice(axes, labelsize=8, lw=1.5, width=0):
 
 
 def add_fig_labels(axes, fontsize=10):
-    labels = string.ascii_uppercase
+    labels = string.ascii_lowercase
     for i in range(len(axes)):
         axes[i].text(
             -0.15,
@@ -40,8 +40,8 @@ def add_fig_labels(axes, fontsize=10):
             labels[i],
             fontsize=fontsize,
             transform=axes[i].transAxes,
-            fontweight="bold",
-            color="gray",
+            # fontweight="bold",
+            color="black",
         )
 
 

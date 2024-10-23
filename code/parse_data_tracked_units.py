@@ -21,7 +21,6 @@ import parse_data
 # global variables
 
 
-
 def get_ephys_tracked_data(source_path, save_path, length):
     run_cmd(f"mkdir -p {save_path}")
     all_spikes = []
@@ -164,7 +163,7 @@ def save_rates_ephys_tracked_data(rates, save_path):
 
 
 def create_ephys_tracked_units(fixed_length):
-    save_dir = "data/tracked_units"
+    save_dir = "../data/tracked_units"
     jaws_path = (
         "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
     )
@@ -220,9 +219,9 @@ def create_ephys_tracked_units(fixed_length):
         window=2,
     )
 
-    """run_cmd(
+    run_cmd(
         '/Applications/MATLAB_R2021b.app/bin/matlab -nojvm -nodesktop -batch "get_osc_data_ephys_tracked"'
-    )"""
+    )
     all_jaws_data = np.zeros((jaws_rates.shape[1], 12, jaws_rates.shape[0]))
     print(all_jaws_data.shape)
     for i in range(all_jaws_data.shape[2]):
@@ -287,11 +286,11 @@ def create_ephys_tracked_units(fixed_length):
             data=all_npas_data[:, :, k], columns=col_labels, index=treatment_index
         )
         npas_export_df["DD Probability"] = np.loadtxt(
-            f"data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
+            f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
             usecols=0,
         )
         npas_export_df["Naive Probability"] = np.loadtxt(
-            f"data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
+            f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
             usecols=1,
         )
         npas_export_df["mouse"] = npas_mouse[k]
@@ -299,7 +298,7 @@ def create_ephys_tracked_units(fixed_length):
         npas_export_df["folder"] = npas_folder[k]
         npas_export_df["name"] = npas_cell_name[k]
         npas_export_df.to_csv(
-            f"data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}.csv"
+            f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}.csv"
         )
 
     for k in range(all_jaws_data.shape[2]):
@@ -307,11 +306,11 @@ def create_ephys_tracked_units(fixed_length):
             data=all_jaws_data[:, :, k], columns=col_labels, index=treatment_index
         )
         jaws_export_df["DD Probability"] = np.loadtxt(
-            f"data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
+            f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
             usecols=0,
         )
         jaws_export_df["Naive Probability"] = np.loadtxt(
-            f"data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
+            f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
             usecols=1,
         )
 
@@ -320,7 +319,7 @@ def create_ephys_tracked_units(fixed_length):
         jaws_export_df["folder"] = jaws_folder[k]
         jaws_export_df["name"] = jaws_cell_name[k]
         jaws_export_df.to_csv(
-            f"data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}.csv"
+            f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}.csv"
         )
 
     sys.exit()
@@ -913,7 +912,7 @@ def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
 
 
 training_fixed_length = 30
-plot_tracked_healthy_dd(
+"""plot_tracked_healthy_dd(
     "data/tracked_units/jaws_treatment_data", "data/tracked_units/npas_treatment_data"
-)
-# create_ephys_tracked_units(training_fixed_length)
+)"""
+create_ephys_tracked_units(training_fixed_length)
