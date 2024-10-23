@@ -20,17 +20,17 @@ freqs_long = 0:FS/wind:FS/2-FS/wind; % full range
 direcs = ["npas_neurons/tracked_units","jaws_neurons/tracked_units"];
 
 for direc = 1:length(direcs)
-    cell_files = dir(fullfile(sprintf('data/tracked_units/%s/cell_*'),direcs(direc)));
+    cell_files = dir(fullfile(sprintf('../data/tracked_units/%s/cell_*'),direcs(direc)));
     for k = 1:length(cell_files)
         if contains(cell_files(k).name,"cell")
-            spike_files = dir(fullfile(sprintf('data/tracked_units/%s/%s/spikes/segment*.txt',direcs(direc),cell_files(k).name)));
-            firing_rates = importdata(sprintf('data/tracked_units/%s/%s/rates.txt',direcs(direc),cell_files(k).name));
+            spike_files = dir(fullfile(sprintf('../data/tracked_units/%s/%s/spikes/segment*.txt',direcs(direc),cell_files(k).name)));
+            firing_rates = importdata(sprintf('../data/tracked_units/%s/%s/rates.txt',direcs(direc),cell_files(k).name));
             recording_lengths = ones(length(firing_rates),1)*min_length;
             output_data = zeros(length(spike_files),8); %  (1) delta osc, (2) renewal power, (3) reg power, (4) peak_freq, (5) beta osc, (6) renewal power, (7) reg power, (8) peak freq
 
             for i = 1:length(spike_files)
                 if firing_rates(i) >= min_rate && recording_lengths(i) >= min_length
-                    spikes = importdata(sprintf("data/tracked_units/%s/%s/spikes/%s",direcs(direc),cell_files(k).name,spike_files(i).name));
+                    spikes = importdata(sprintf("../data/tracked_units/%s/%s/spikes/%s",direcs(direc),cell_files(k).name,spike_files(i).name));
 
                     % Check delta osc
                     [~, delta_freq_ind] = min(abs(freqs-delta_force_freq));
@@ -65,7 +65,7 @@ for direc = 1:length(direcs)
             end
 
 
-            writematrix(output_data,sprintf("data/tracked_units/%s/%s/osc_data.txt",direcs(direc),cell_files(k).name));
+            writematrix(output_data,sprintf("../data/tracked_units/%s/%s/osc_data.txt",direcs(direc),cell_files(k).name));
 
         end
     end
@@ -74,14 +74,14 @@ end
 
 
 exit
-recording_lengths = importdata(sprintf('data/tracked_units/%s/cell_lengths.txt',direcs(direc)));
-firing_rates = importdata(sprintf('data/tracked_units/%s/cell_frs.txt',direcs(direc)));
+recording_lengths = importdata(sprintf('../data/tracked_units/%s/cell_lengths.txt',direcs(direc)));
+firing_rates = importdata(sprintf('../data/tracked_units/%s/cell_frs.txt',direcs(direc)));
 
 output_data = zeros(length(spike_files),6); %  delta osc, power, peak_freq, beta osc, power, peak freq
 
 for i = 1:length(spike_files)
     if firing_rates(i) >= min_rate && recording_lengths(i) >= min_length
-        spikes = importdata(sprintf("data/tracked_units/%s/spikes/%s",direcs(direc),spike_files(i).name));
+        spikes = importdata(sprintf("../data/tracked_units/%s/spikes/%s",direcs(direc),spike_files(i).name));
 
         % Check delta osc
         [~, delta_freq_ind] = min(abs(freqs-delta_force_freq));
@@ -114,6 +114,6 @@ for i = 1:length(spike_files)
 end
 
 
-writematrix(output_data,sprintf("data/tracked_units/%s/osc_data.txt",direcs(direc)));
+writematrix(output_data,sprintf("../data/tracked_units/%s/osc_data.txt",direcs(direc)));
 
 
