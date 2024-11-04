@@ -17,7 +17,7 @@ delta_srch_lo = 0.5; delta_srch_hi = 4; delta_force_freq = 2;
 freqs = 0:FS/wind:50; % for most purposes only care about this range
 freqs_long = 0:FS/wind:FS/2-FS/wind; % full range
 
-direcs = ["npas_neurons/tracked_units","jaws_neurons/tracked_units"];
+direcs = ["npas_neurons/cell_data","jaws_neurons/cell_data"];
 
 for direc = 1:length(direcs)
     cell_files = dir(fullfile(sprintf('../data/tracked_units/%s/cell_*'),direcs(direc)));
