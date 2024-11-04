@@ -294,22 +294,22 @@ def feature_importance_clustered(
         "None",
         "Cluster I",
         "Cluster II",
-        "Cluster I + II",
-        "Num Bursts",
         "Cluster III",
-        "All - Cluster I + II",
+        "Cluster IV",
+        "Cluster V",
+        "Cluster VI",
+        "Cluster VII",
     ]
 
-    cluster_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
-    cluster_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
-    cluster_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
-    train_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
-    train_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
-    test_probs_dd = np.zeros((len(xlabels_cluster), len(seeds)))
-    test_probs_naive = np.zeros((len(xlabels_cluster), len(seeds)))
-    train_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
-    test_acc_scores = np.zeros((len(xlabels_cluster), len(seeds)))
-    print(feature_df.columns)
+    cluster_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    cluster_probs_dd = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    cluster_probs_naive = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    train_probs_dd = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    train_probs_naive = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    test_probs_dd = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    test_probs_naive = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    train_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
+    test_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
 
     cluster_I = ["Delta Power"]
     cluster_II = [
@@ -318,16 +318,17 @@ def feature_importance_clustered(
         "CV",
         "Burst Firing Rate Increase",
     ]
-    cluster_III = ["FR", "Avg Burst Firing Rate", "Non Bursting Firing Rate"]
+    cluster_III = ["Num Bursts"]
+    cluster_IV = ["FR", "Avg Burst Firing Rate", "Non Bursting Firing Rate"]
+    cluster_V = ["Beta Power"]
+    cluster_VI = ["Avg Interburst Interval"]
+    cluster_VII = ["Avg Burst Duration"]
     cluster_I_II = [
         "Delta Power",
         "Percent of Spikes in Bursts",
         "Percent Time Bursting",
         "CV",
         "Burst Firing Rate Increase",
-    ]
-    num_bursts = [
-        "Num Bursts",
     ]
     except_I_II = [
         "FR",
@@ -338,14 +339,28 @@ def feature_importance_clustered(
         "Avg Interburst Interval",
         "Avg Burst Duration",
     ]
+    # All minus NumBursts, ClusterIII, beta
+    except_III_IV_V = [
+        "Delta Power",
+        "Percent of Spikes in Bursts",
+        "Percent Time Bursting",
+        "CV",
+        "Burst Firing Rate Increase",
+        "Avg Interburst Interval",
+        "Avg Burst Duration",
+    ]
 
     cluster_runs = [
         cluster_I,
         cluster_II,
-        cluster_I_II,
-        num_bursts,
         cluster_III,
+        cluster_IV,
+        cluster_V,
+        cluster_VI,
+        cluster_VII,
+        cluster_I_II,
         except_I_II,
+        # except_III_IV_V,
     ]
 
     run = 0
@@ -409,13 +424,10 @@ def feature_importance_clustered(
     features = feature_df.columns
 
     for cr in cluster_runs:
-        print(xlabels_cluster[run])
-        # cr_locs = [feature_df.columns.get_loc(x) for x in cr]
         cols = []
         for i in range(len(features)):
             if features[i] not in cr:
                 cols.append(i)
-        print(cols)
 
         tmp_feature_df = pd.concat(
             [
@@ -426,9 +438,6 @@ def feature_importance_clustered(
         tmp_target_df = pd.concat(
             [target_df],
         )
-
-        print(tmp_feature_df.columns)
-        print()
 
         for i in seeds:
             np.random.seed(i)
@@ -492,10 +501,10 @@ def feature_importance_clustered(
 
     fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax3.errorbar(
-        np.arange(cluster_acc_scores.shape[0]),
-        np.mean(cluster_acc_scores, axis=1),
-        yerr=scipy.stats.sem(cluster_acc_scores, axis=1),
-        color="b",
+        np.arange(len(xlabels_cluster)),
+        np.mean(cluster_acc_scores[:-2, :], axis=1),
+        yerr=scipy.stats.sem(cluster_acc_scores[:-2, :], axis=1),
+        color="k",
         capsize=4,
         marker="o",
         lw=0.5,
@@ -524,9 +533,19 @@ def feature_importance_clustered(
         markersize=4,
         label="Test",
     )"""
+    ax3.hlines(
+        np.mean(cluster_acc_scores[-2, :]), 0, len(xlabels_cluster), lw=0.5, color="k"
+    )
+    ax3.hlines(
+        np.mean(cluster_acc_scores[-1, :]),
+        0,
+        len(xlabels_cluster),
+        lw=0.5,
+        color="gray",
+    )
     ax3.set_xticks(np.arange(len(xlabels_cluster)))
     ax3.set_xticklabels(xlabels_cluster, rotation=90, fontsize=6)
-    ax3.grid(visible=True, which="both")
+    ax3.grid(visible=False, which="both")
     ax3.set_ylabel("Accuracy")
     ax3.set_xlabel("Features Removed")
     makeNice(ax3)
@@ -538,17 +557,17 @@ def feature_importance_clustered(
 
     fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax3.errorbar(
-        np.arange(cluster_probs_dd.shape[0]),
-        np.mean(cluster_probs_dd, axis=1),
-        yerr=scipy.stats.sem(cluster_probs_dd, axis=1),
-        color="r",
+        np.arange(len(xlabels_cluster)),
+        np.mean(cluster_probs_dd[:-2, :], axis=1),
+        yerr=scipy.stats.sem(cluster_probs_dd[:-2, :], axis=1),
+        color="k",
         capsize=4,
         marker="o",
         lw=0.5,
         markersize=4,
         label="clusters",
     )
-    ax3.errorbar(
+    """ax3.errorbar(
         np.arange(cluster_probs_naive.shape[0]),
         np.mean(cluster_probs_naive, axis=1),
         yerr=scipy.stats.sem(cluster_probs_naive, axis=1),
@@ -558,7 +577,7 @@ def feature_importance_clustered(
         lw=0.5,
         markersize=4,
         label="clusters",
-    )
+    )"""
     """ax3.errorbar(
         np.arange(test_probs_dd.shape[0]),
         np.mean(test_probs_dd, axis=1),
@@ -581,9 +600,15 @@ def feature_importance_clustered(
         markersize=4,
         label="Test",
     )"""
+    ax3.hlines(
+        np.mean(cluster_probs_dd[-2, :]), 0, len(xlabels_cluster), lw=0.5, color="k"
+    )
+    ax3.hlines(
+        np.mean(cluster_probs_dd[-1, :]), 0, len(xlabels_cluster), lw=0.5, color="gray"
+    )
     ax3.set_xticks(np.arange(len(xlabels_cluster)))
     ax3.set_xticklabels(xlabels_cluster, rotation=90, fontsize=6)
-    ax3.grid(visible=True, which="both")
+    ax3.grid(visible=False, which="both")
     ax3.set_ylabel("Confidence")
     ax3.set_xlabel("Features Removed")
     makeNice(ax3)
@@ -1055,49 +1080,6 @@ def predict_motor_rescue(
     y_outliers = target_df_outliers["Type"]
     target_df_outliers = target_df_outliers.drop(columns="Type")
 
-    """fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
-    axes = [ax[i, j] for i in range(4) for j in range(3)]
-    count = 0
-    for col in target_df_outliers.columns:
-        bins = np.histogram_bin_edges(target_df_outliers[col], bins=20)
-        outliers_naive = target_df_outliers[y_outliers == 1][col]
-        outliers_dd = target_df_outliers[y_outliers == 0][col]
-        feat_mean = np.mean(target_df[col])
-        feat_std = np.std(target_df[col])
-        sns.histplot(
-            x=outliers_naive,
-            color="r",
-            edgecolor="w",
-            kde=True,
-            stat="probability",
-            ax=axes[count],
-            bins=bins,
-        )
-        sns.histplot(
-            x=outliers_dd,
-            color="b",
-            edgecolor="w",
-            kde=True,
-            stat="probability",
-            ax=axes[count],
-            bins=bins,
-        )
-        ylims = axes[count].get_ylim()
-        axes[count].vlines(
-            [feat_mean - feat_std, feat_mean, feat_mean + feat_std],
-            ylims[0],
-            ylims[1],
-            color="k",
-            ls="dashed",
-            lw=0.5,
-        )
-
-        count += 1
-    makeNice(axes)
-    fig.savefig("../data/outliers_features.pdf")
-    plt.close()
-    sys.exit()"""
-
     jaws_npas_pre_post_dropped = [
         x.drop(columns=["mouse", "folder", "name", "Post-Time", "Medial"])
         for x in jaws_npas_pre_post
@@ -1190,6 +1172,8 @@ def predict_motor_rescue(
         with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "wb") as f:
             pickle.dump(clf, f)
 
+        X_train.to_csv(f"../data/neural_net/X_train_seed_{seed:02d}.csv")
+
         # Get network statistics
         predicts_train = clf.predict(X_train_norm)
         predicts_test = clf.predict(X_test_norm)
@@ -1234,28 +1218,28 @@ def predict_motor_rescue(
             jaws_npas_pre_post_probs[i][run, :, :] = jaws_npas_probs[i]
 
             ### FIND PREDICTED PROPORTIONS OF CLASSES
-            # jaws precicted DD %
+            # jaws predicted DD %
             jaws_npas_pre_post_predicts[i][run, 0] = len(
                 jaws_npas_predicts[i][
                     (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                     & (jaws_npas_predicts[i] == 0)
                 ]
             ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "JAWS"])
-            # jaws precicted naive %
+            # jaws predicted naive %
             jaws_npas_pre_post_predicts[i][run, 1] = len(
                 jaws_npas_predicts[i][
                     (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                     & (jaws_npas_predicts[i] == 1)
                 ]
             ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "JAWS"])
-            # npas precicted DD %
+            # npas predicted DD %
             jaws_npas_pre_post_predicts[i][run, 2] = len(
                 jaws_npas_predicts[i][
                     (jaws_npas_pre_post[i]["mouse"] == "NPAS")
                     & (jaws_npas_predicts[i] == 0)
                 ]
             ) / len(jaws_npas_pre_post[i][jaws_npas_pre_post[i]["mouse"] == "NPAS"])
-            # npas precicted naive %
+            # npas predicted naive %
             jaws_npas_pre_post_predicts[i][run, 3] = len(
                 jaws_npas_predicts[i][
                     (jaws_npas_pre_post[i]["mouse"] == "NPAS")
@@ -1415,6 +1399,47 @@ def predict_motor_rescue(
 
         run += 1
 
+    jaws_probs = [
+        np.mean(jaws_npas_pre_post_probs[i][:, :, 0], axis=1)
+        for i in range(len(jaws_npas_pre_post_probs))
+    ]
+
+    npas_probs = [
+        jaws_npas_pre_post_probs[i][
+            :,
+            (jaws_npas_pre_post[i]["mouse"] == "NPAS"),
+            0,
+        ]
+        for i in range(len(jaws_npas_pre_post_probs))
+    ]
+
+    time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    for i in range(len(jaws_npas_pre_post_probs)):
+        np.savetxt(
+            f"../data/npas_probs_conf_all_{time_plot[i]}.csv",
+            jaws_npas_pre_post_probs[i][
+                :,
+                (jaws_npas_pre_post[i]["mouse"] == "NPAS"),
+                0,
+            ],
+            fmt="%f",
+            delimiter=",",
+            newline="\n",
+        )
+    time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    for i in range(len(jaws_npas_pre_post_probs)):
+        np.savetxt(
+            f"../data/jaws_probs_conf_all_{time_plot[i]}.csv",
+            jaws_npas_pre_post_probs[i][
+                :,
+                (jaws_npas_pre_post[i]["mouse"] == "JAWS"),
+                0,
+            ],
+            fmt="%f",
+            delimiter=",",
+            newline="\n",
+        )
+
     for i in range(len(jaws_npas_pre_post)):
         jaws_npas_pre_post[i]["DD Probability"] = np.mean(
             jaws_npas_pre_post_probs[i][:, :, 0], axis=0
@@ -1449,11 +1474,12 @@ def predict_motor_rescue(
                     & (npas_x["DD Probability"] <= dd_prob_splits[i][1])
                 ]
             )
+
+        print("jaws:\t", jaws_probs)
+        print("npas:\t", npas_probs)
+
         jaws_probs = jaws_probs / np.sum(jaws_probs)
         npas_probs = npas_probs / np.sum(npas_probs)
-
-        print("Npas:\t", npas_probs)
-        print("Jaws:\t", jaws_probs)
 
         axes[0].scatter(
             np.random.rand(len(jaws_x)) * 0.25 + 0.25 + count,
@@ -1500,7 +1526,6 @@ def predict_motor_rescue(
     add_fig_labels(axes)
     fig.savefig("../data/neural_net/jaws_npas_summary.pdf", bbox_inches="tight")
     plt.close()
-    run_cmd("open ../data/neural_net/jaws_npas_summary.pdf")
 
     np.savetxt(
         "../data/neural_net/jaws_pre_post_summary.csv",
@@ -1521,7 +1546,11 @@ def predict_motor_rescue(
 
     all_pre_post = pd.concat(jaws_npas_pre_post)
     all_pre_post.to_csv("../data/neural_net/jaws_npas_pre_post.csv")
-    print(np.mean(accuracies, axis=0))
+    print(
+        "Train/Test Accuracies (avg +/- sem):\t",
+        np.mean(accuracies, axis=0),
+        scipy.stats.sem(accuracies, axis=0),
+    )
 
     fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(4) for j in range(3)]
@@ -1592,7 +1621,6 @@ def predict_motor_rescue(
     makeNice(axes)
     fig.savefig("../data/conf_thres_features.pdf", bbox_inches="tight")
     plt.close()
-    run_cmd("open ../data/conf_thres_features.pdf")
 
     outliers_correct_naive = target_df_outliers.loc[
         (outlier_probabilities[:, 1] > 0.5) & (y_outliers == 1), :
@@ -1642,12 +1670,10 @@ def predict_motor_rescue(
             linewidths=0.05,
         )
         axes[count].set_title(titles[count], fontsize=6)
-        # axes[count].tick_params(axis="x", which="major", labelsize=4)
         count += 1
     add_fig_labels(axes)
     fig.savefig("../data/neural_net/outliers_heatmaps.pdf")
     plt.close()
-    run_cmd("open ../data/neural_net/outliers_heatmaps.pdf")
 
     fig, ax = plt.subplots(3, 2, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(3) for j in range(2)]
@@ -1708,14 +1734,35 @@ def predict_motor_rescue(
     )
     plt.close()
 
+    jaws_predicts = np.array(
+        [jaws_npas_pre_post_predicts[i][:, 0] for i in range(len(jaws_npas_pre_post))]
+    )
+    npas_predicts = np.array(
+        [jaws_npas_pre_post_predicts[i][:, 2] for i in range(len(jaws_npas_pre_post))]
+    )
+    np.savetxt(
+        "../data/jaws_predicts_runs_data.csv",
+        jaws_predicts,
+        delimiter=",",
+        fmt="%f",
+        newline="\n",
+    )
+    np.savetxt(
+        "../data/npas_predicts_runs_data.csv",
+        npas_predicts,
+        delimiter=",",
+        fmt="%f",
+        newline="\n",
+    )
+
     axes[2].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts[i][:, 1])
+            np.mean(jaws_npas_pre_post_predicts[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 1])
+            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="b",
@@ -1728,11 +1775,11 @@ def predict_motor_rescue(
     axes[2].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts[i][:, 3])
+            np.mean(jaws_npas_pre_post_predicts[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 3])
+            scipy.stats.sem(jaws_npas_pre_post_predicts[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="r",
@@ -1745,11 +1792,11 @@ def predict_motor_rescue(
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 1])
+            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 1])
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="b",
@@ -1763,11 +1810,11 @@ def predict_motor_rescue(
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 3])
+            np.mean(jaws_npas_pre_post_predicts_medial[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 3])
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="r",
@@ -1781,11 +1828,11 @@ def predict_motor_rescue(
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 1])
+            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 1])
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 0])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="b",
@@ -1799,11 +1846,11 @@ def predict_motor_rescue(
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post), 2 * len(jaws_npas_pre_post)),
         [
-            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 3])
+            np.mean(jaws_npas_pre_post_predicts_non_medial[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         yerr=[
-            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 3])
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[i][:, 2])
             for i in range(len(jaws_npas_pre_post))
         ],
         color="r",
@@ -1820,7 +1867,7 @@ def predict_motor_rescue(
             [
                 np.mean(
                     jaws_npas_pre_post_probs[i][
-                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 1
+                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 0
                     ],
                     axis=1,
                 )
@@ -1832,7 +1879,7 @@ def predict_motor_rescue(
             [
                 np.mean(
                     jaws_npas_pre_post_probs[i][
-                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 1
+                        :, jaws_npas_pre_post[i]["mouse"] == "JAWS", 0
                     ],
                     axis=1,
                 )
@@ -1853,7 +1900,7 @@ def predict_motor_rescue(
             [
                 np.mean(
                     jaws_npas_pre_post_probs[i][
-                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 1
+                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 0
                     ],
                     axis=1,
                 )
@@ -1865,7 +1912,7 @@ def predict_motor_rescue(
             [
                 np.mean(
                     jaws_npas_pre_post_probs[i][
-                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 1
+                        :, jaws_npas_pre_post[i]["mouse"] == "NPAS", 0
                     ],
                     axis=1,
                 )
@@ -1889,7 +1936,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                         & (jaws_npas_pre_post[i]["Medial"] == 1),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -1904,7 +1951,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                         & (jaws_npas_pre_post[i]["Medial"] == 1),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -1929,7 +1976,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "NPAS")
                         & (jaws_npas_pre_post[i]["Medial"] == 1),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -1944,7 +1991,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "NPAS")
                         & (jaws_npas_pre_post[i]["Medial"] == 1),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -1969,7 +2016,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                         & (jaws_npas_pre_post[i]["Medial"] == 0),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -1984,7 +2031,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "JAWS")
                         & (jaws_npas_pre_post[i]["Medial"] == 0),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -2009,7 +2056,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "NPAS")
                         & (jaws_npas_pre_post[i]["Medial"] == 0),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -2024,7 +2071,7 @@ def predict_motor_rescue(
                         :,
                         (jaws_npas_pre_post[i]["mouse"] == "NPAS")
                         & (jaws_npas_pre_post[i]["Medial"] == 0),
-                        1,
+                        0,
                     ],
                     axis=1,
                 )
@@ -2050,10 +2097,10 @@ def predict_motor_rescue(
         axes[i].set_yticklabels(["Depleted", "Control"])
 
     for i in [2, 3, 4, 5]:
-        axes[i].set_ylabel("Predicted Naive %" if i != 5 else "Naive Probability")
+        axes[i].set_ylabel("Predicted DD %" if i < 4 else "DD Confidence")
         axes[i].set_xticks([0, 1, 2, 3])
         xlim = axes[i].get_xlim()
-        if i == 3 or i == 2:
+        """if i == 3 or i == 2:
             axes[i].hlines(
                 1 - np.mean(precisions[:, 0]),
                 xlim[0],
@@ -2070,7 +2117,7 @@ def predict_motor_rescue(
                 lw=0.5,
                 ls="dotted",
             )
-            axes[i].set_xlim(xlim)
+            axes[i].set_xlim(xlim)"""
 
         if i == 3 or i == 5:
             axes[i].set_xticks(np.arange(len(jaws_npas_pre_post) * 2))
@@ -2102,8 +2149,6 @@ def predict_motor_rescue(
     [axes[i].grid(lw=0.1, alpha=0.5) for i in range(2, len(axes))]
 
     makeNice(axes[2:], labelsize=6)
-    match_axis(axes[2:4], type="y")
-    match_axis(axes[4:], type="y")
     add_fig_labels(axes)
     fig.savefig(
         f"../data/neural_net/motor_rescue_conf_mat.pdf",
@@ -2115,6 +2160,9 @@ def predict_motor_rescue(
         run_cmd("open ../data/neural_net/motor_rescue_conf_mat.pdf")
         run_cmd("open ../data/neural_net/conf_mat_train.pdf")
         run_cmd("open ../data/neural_net/conf_mat_test.pdf")
+        run_cmd("open ../data/neural_net/outliers_heatmaps.pdf")
+        run_cmd("open ../data/conf_thres_features.pdf")
+        run_cmd("open ../data/neural_net/jaws_npas_summary.pdf")
 
 
 def predict_motor_rescue_archive(

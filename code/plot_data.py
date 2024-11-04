@@ -20,6 +20,43 @@ mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 
 
+def plot_pre_post_boxplots(
+    jaws_npas_df, show=False, pre_times=[0, 0], post_times=[30, 210]
+):
+    for col in jaws_npas_df.columns[0:12]:
+        for mouse in ["JAWS", "NPAS"]:
+            fig, ax = plt.subplots(1, 1, figsize=(1.5, 2), dpi=300, tight_layout=True)
+            jaws_pre = jaws_npas_df[
+                (jaws_npas_df["mouse"] == mouse)
+                & (jaws_npas_df["Post-Time"] >= pre_times[0])
+                & (jaws_npas_df["Post-Time"] <= pre_times[1])
+            ]
+            jaws_post = jaws_npas_df[
+                (jaws_npas_df["mouse"] == mouse)
+                & (jaws_npas_df["Post-Time"] >= post_times[0])
+                & (jaws_npas_df["Post-Time"] <= post_times[1])
+            ]
+            bps = ax.boxplot(
+                [jaws_pre[col], jaws_post[col]],
+                showfliers=False,
+                widths=0.75,
+                boxprops={"color": "k" if mouse == "JAWS" else "purple"},
+                whiskerprops={"color": "k" if mouse == "JAWS" else "purple"},
+                medianprops={"color": "k" if mouse == "JAWS" else "purple"},
+                capprops={"color": "k" if mouse == "JAWS" else "purple"},
+                patch_artist=True,
+            )
+            bps["boxes"][0].set(facecolor="white")
+            bps["boxes"][1].set(facecolor="gray" if mouse == "JAWS" else "mediumpurple")
+
+            ax.set_ylabel(col)
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(["Pre", "Post"])
+            makeNice(ax)
+            fig.savefig(f"../data/boxplot_{mouse}_{col}.pdf", bbox_inches="tight")
+            plt.close()
+
+
 def plot_pre_post_histograms(
     motor_rescue_dfs, post_jaws_dfs, post_npas_dfs, show=False
 ):

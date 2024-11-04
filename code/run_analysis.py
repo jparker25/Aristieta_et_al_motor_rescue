@@ -292,7 +292,8 @@ use_feature = {
     "name": False,
 }
 
-plot_data.plot_feature_histograms_separate(combined_df, feature_outlier_strength)
+# plot_data.plot_feature_histograms_separate(combined_df, feature_outlier_strength)
+# plot_data.plot_pre_post_boxplots(jaws_npas_df, show=False)
 
 
 ### GATHER THE FEATURES IN AN ARRAY ###
@@ -303,9 +304,9 @@ for col in combined_df.columns:
         feature_array.append(count)
     count += 1
 
-mlp = False
+mlp = True
 pca = False
-feature_removal = True
+feature_removal = False
 num_seeds = 15
 training_split = 0.8
 
@@ -317,7 +318,7 @@ if mlp:
         jaws_npas_pre_post,
         train_amount=training_split,
         seeds=np.arange(num_seeds),
-        show=True,
+        show=False,
         test_outliers=False,
         nonlinear_transforms=False,
         min_max_scale=False,
@@ -333,15 +334,14 @@ if feature_removal:
         show=False,
     )
 
-    sys.exit()
-    run_neural_net.feature_importance_selected(
+    """run_neural_net.feature_importance_selected(
         combined_df,
         feature_array,
         feature_outlier_strength,
         train_amount=training_split,
         seeds=np.arange(num_seeds),
         show=False,
-    )
+    )"""
 
 if pca:
     run_pca.run_pca_for_figures(combined_df, feature_array, feature_outlier_strength)

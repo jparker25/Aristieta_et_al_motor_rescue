@@ -97,6 +97,9 @@ def run_pca_for_figures(
         if naive_dist < dd_dist:
             centroid_match_train[i] = 1
 
+    acc = accuracy_score(types, centroid_match_train)
+    print("PCA Cluster Acc:\t", acc)
+
     fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax.scatter(
         X_pca[:, 0],
@@ -134,6 +137,12 @@ def run_pca_for_figures(
             clf = pickle.load(f)
 
         predicts_prob += clf.predict_proba(feature_df_norm) / len(seeds)
+
+    acc = accuracy_score(
+        types,
+        [0 if predicts_prob[i, 0] >= 0.5 else 1 for i in range(predicts_prob.shape[0])],
+    )
+    print("MLP Accuracy:\t", acc)
     fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax.scatter(
         X_pca[:, 0],

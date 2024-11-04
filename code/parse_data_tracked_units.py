@@ -8,17 +8,33 @@ from scipy import stats
 import matplotlib.patches as patches
 from PIL import Image
 import matplotlib as mpl
+import pickle
 
-mpl.rcParams["pdf.fonttype"] = 42
-mpl.rcParams["ps.fonttype"] = 42
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Arial"]
+plt.rcParams["axes.labelsize"] = 8
 
 
 # user modules
 import poisson_surprise
 from helpers import *
 import parse_data
+import clean_data
 
 # global variables
+save_dir = "../data/tracked_units"
+jaws_cell_save_dir = f"{save_dir}/jaws_neurons/cell_data"
+jaws_features_save_dir = f"{save_dir}/jaws_neurons/features"
+npas_cell_save_dir = f"{save_dir}/npas_neurons/cell_data"
+npas_features_save_dir = f"{save_dir}/npas_neurons/features"
+jaws_feature_plots = f"{save_dir}/jaws_neurons/plots"
+npas_feature_plots = f"{save_dir}/npas_neurons/plots"
+jaws_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
+npas_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_pre_processed"
+jaws_cells = 23
+npas_cells = 10
+seeds = 15
+neural_net = "../data/neural_net"
 
 
 def get_ephys_tracked_data(source_path, save_path, length):
@@ -162,32 +178,703 @@ def save_rates_ephys_tracked_data(rates, save_path):
         cell_count += 1
 
 
-def create_ephys_tracked_units(fixed_length):
-    save_dir = "../data/tracked_units"
-    jaws_path = (
-        "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
+def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
+    jaws_data = []
+    for i in range(jaws_units):
+        jaws_data.append(pd.read_csv(f"{jaws_path}/jaws_treatment_cell_{i+1}.csv"))
+    jaws_dd = np.zeros(76)
+    jaws_dd_prob = np.zeros(76)
+    for i in range(len(jaws_dd)):
+        for data in jaws_data:
+            jaws_dd_prob[i] += (
+                data.iloc[i, data.columns.get_loc("DD Probability")] / jaws_units
+            )
+            if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
+                jaws_dd[i] += 1 / jaws_units
+    npas_data = []
+    for i in range(npas_units):
+        npas_data.append(pd.read_csv(f"{npas_path}/npas_treatment_cell_{i+1}.csv"))
+    npas_dd = np.zeros(76)
+    npas_dd_prob = np.zeros(76)
+    for i in range(len(npas_dd)):
+        for data in npas_data:
+            npas_dd_prob[i] += (
+                data.iloc[i, data.columns.get_loc("DD Probability")] / npas_units
+            )
+            if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
+                npas_dd[i] += 1 / npas_units
+    fig, ax = plt.subplots(2, 1, figsize=(8, 4), dpi=300, tight_layout=True)
+    axes = [ax[i] for i in range(2)]
+    axes[0].plot(np.arange(76), jaws_dd, color="blue", label="JAWS DD % (23 Units)")
+    axes[0].plot(np.arange(76), npas_dd, color="red", label="Npas DD % (10 Units)")
+    axes[0].vlines(np.arange(6, 76, 7), 0, 1, color="k", linestyle="dashed")
+    axes[0].legend()
+    axes[1].plot(
+        np.arange(76), jaws_dd_prob, color="blue", label="JAWS Avg DD Probability"
     )
+    axes[1].plot(
+        np.arange(76), npas_dd_prob, color="red", label="Npas Avg DD Probability"
+    )
+    axes[1].vlines(np.arange(6, 76, 7), 0, 1, color="k", linestyle="dashed")
+    axes[1].legend()
+    axes[0].set_xticks(np.arange(0, 76))
+    axes[0].set_xticklabels(np.arange(-180, 70 * 30, 30), rotation=90)
+    axes[1].set_xticks(np.arange(0, 76))
+    axes[1].set_xticklabels(np.arange(-180, 70 * 30, 30), rotation=90)
+    axes[0].set_ylabel("Percent DD")
+    axes[1].set_ylabel("Average DD Probability")
+    makeNice(axes, labelsize=6)
+    fig.savefig(f"../data/tracked_units/dd_probabilities.pdf", bbox_inches="tight")
+    plt.close()
+    run_cmd("open data/tracked_units/dd_probabilities.pdf")
+
+
+def create_feature_results():
+    run_cmd(f"mkdir -p {jaws_feature_plots}")
+    run_cmd(f"mkdir -p {npas_feature_plots}")
+
+    jaws_feature_tables = [
+        pd.read_csv(
+            f"{jaws_features_save_dir}/jaws_treatment_cell_{i+1:04d}.csv",
+            index_col="Unnamed: 0",
+        )
+        for i in range(jaws_cells)
+    ]
+
+    [jaws_feature_tables[i].fillna(0, inplace=True) for i in range(jaws_cells)]
+
+    npas_feature_tables = [
+        pd.read_csv(
+            f"{npas_features_save_dir}/npas_treatment_cell_{i+1:04d}.csv",
+            index_col="Unnamed: 0",
+        )
+        for i in range(npas_cells)
+    ]
+
+    [npas_feature_tables[i].fillna(0, inplace=True) for i in range(npas_cells)]
+
+    times = np.arange(-180, 30 * len(jaws_feature_tables[0]) - 180, 30)
+    stim_times = np.arange(0, (10 * 210), 210)
+    pre_times = [f"{x}" for x in np.arange(-30, -30 + (10 * 210), 210)]
+    post_times = [f"{x}" for x in np.arange(30, 30 + (10 * 210), 210)]
+
+    jaws_prob_dd = np.zeros((len(jaws_feature_tables[0]), jaws_cells))
+    jaws_prob_naive = np.zeros((len(jaws_feature_tables[0]), jaws_cells))
+
+    for jc in range(jaws_cells):
+        for i in range(seeds):
+            X_train = pd.read_csv(f"{neural_net}/X_train_seed_{i:02d}.csv").iloc[:, 1:]
+            X_train_norm, jaws_norm = clean_data.normalize_data(
+                X_train,
+                jaws_feature_tables[jc].iloc[:, 0:12],
+                min_max=False,
+            )
+
+            with open(f"{neural_net}/MLP_seed_{i:02d}.pkl", "rb") as mlp_file:
+                mlp_clf = pickle.load(mlp_file)
+                probs = mlp_clf.predict_proba(jaws_norm) / seeds
+                jaws_prob_dd[:, jc] += probs[:, 0]
+                jaws_prob_naive[:, jc] += probs[:, 1]
+
+    npas_prob_dd = np.zeros((len(npas_feature_tables[0]), npas_cells))
+    npas_prob_naive = np.zeros((len(npas_feature_tables[0]), npas_cells))
+
+    for jc in range(npas_cells):
+        for i in range(seeds):
+            X_train = pd.read_csv(f"{neural_net}/X_train_seed_{i:02d}.csv").iloc[:, 1:]
+            X_train_norm, npas_norm = clean_data.normalize_data(
+                X_train,
+                npas_feature_tables[jc].iloc[:, 0:12],
+                min_max=False,
+            )
+
+            with open(f"{neural_net}/MLP_seed_{i:02d}.pkl", "rb") as mlp_file:
+                mlp_clf = pickle.load(mlp_file)
+                probs = mlp_clf.predict_proba(npas_norm) / seeds
+                npas_prob_dd[:, jc] += probs[:, 0]
+                npas_prob_naive[:, jc] += probs[:, 1]
+
+    jaws_prob_dd_pre = np.mean(
+        jaws_prob_dd[jaws_feature_tables[0]["Treatment Times"].isin(pre_times)], axis=0
+    )
+    jaws_prob_dd_stim = np.mean(
+        jaws_prob_dd[
+            jaws_feature_tables[0]["Treatment Times"].str.contains("Treatment")
+        ],
+        axis=0,
+    )
+    jaws_prob_dd_post = np.mean(
+        jaws_prob_dd[jaws_feature_tables[0]["Treatment Times"].isin(post_times)], axis=0
+    )
+
+    npas_prob_dd_pre = np.mean(
+        npas_prob_dd[npas_feature_tables[0]["Treatment Times"].isin(pre_times)], axis=0
+    )
+    npas_prob_dd_stim = np.mean(
+        npas_prob_dd[
+            npas_feature_tables[0]["Treatment Times"].str.contains("Treatment")
+        ],
+        axis=0,
+    )
+    npas_prob_dd_post = np.mean(
+        npas_prob_dd[npas_feature_tables[0]["Treatment Times"].isin(post_times)], axis=0
+    )
+
+    jaws_prob_naive_pre = np.mean(
+        jaws_prob_naive[jaws_feature_tables[0]["Treatment Times"].isin(pre_times)],
+        axis=0,
+    )
+    jaws_prob_naive_stim = np.mean(
+        jaws_prob_naive[
+            jaws_feature_tables[0]["Treatment Times"].str.contains("Treatment")
+        ],
+        axis=0,
+    )
+    jaws_prob_naive_post = np.mean(
+        jaws_prob_naive[jaws_feature_tables[0]["Treatment Times"].isin(post_times)],
+        axis=0,
+    )
+
+    npas_prob_naive_pre = np.mean(
+        npas_prob_naive[npas_feature_tables[0]["Treatment Times"].isin(pre_times)],
+        axis=0,
+    )
+    npas_prob_naive_stim = np.mean(
+        npas_prob_naive[
+            npas_feature_tables[0]["Treatment Times"].str.contains("Treatment")
+        ],
+        axis=0,
+    )
+    npas_prob_naive_post = np.mean(
+        npas_prob_naive[npas_feature_tables[0]["Treatment Times"].isin(post_times)],
+        axis=0,
+    )
+
+    ### Saving JAWS probabilities
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_dd.csv",
+        jaws_prob_dd,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_naive.csv",
+        jaws_prob_naive,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_dd_pre.csv",
+        jaws_prob_dd_pre,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_dd_stim.csv",
+        jaws_prob_dd_stim,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_dd_post.csv",
+        jaws_prob_dd_post,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_naive_pre.csv",
+        jaws_prob_naive_pre,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_naive_stim.csv",
+        jaws_prob_naive_stim,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{jaws_features_save_dir}/jaws_prob_naive_post.csv",
+        jaws_prob_naive_post,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    ### Saving NPAS probabilities
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_dd.csv",
+        npas_prob_dd,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_naive.csv",
+        npas_prob_naive,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_dd_pre.csv",
+        npas_prob_dd_pre,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_dd_stim.csv",
+        npas_prob_dd_stim,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_dd_post.csv",
+        npas_prob_dd_post,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_naive_pre.csv",
+        npas_prob_naive_pre,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_naive_stim.csv",
+        npas_prob_naive_stim,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    np.savetxt(
+        f"{npas_features_save_dir}/npas_prob_naive_post.csv",
+        npas_prob_naive_post,
+        fmt="%f",
+        delimiter=",",
+        newline="\n",
+    )
+
+    fig, ax = plt.subplots(1, 1, figsize=(4, 2), dpi=300, tight_layout=True)
+    ax.plot(times, np.mean(jaws_prob_dd, axis=1), lw=0.5, label="JAWS")
+    ax.plot(times, np.mean(npas_prob_dd, axis=1), lw=0.5, label="NPAS")
+    ylims = ax.get_ylim()
+    ax.vlines(stim_times, ylims[0], ylims[1], color="k", lw=0.25, ls="dashed")
+    ax.set_ylim(ylims)
+    ax.set_xticks(stim_times)
+    ax.set_xticklabels(stim_times)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("DD Confidence")
+    ax.legend(fancybox=False, frameon=False)
+    makeNice(ax, labelsize=6)
+    fig.savefig(f"{save_dir}/dd_confidence_over_time.pdf", bbox_inches="tight")
+    plt.close()
+
+    pd.DataFrame(
+        data=[
+            np.mean(npas_prob_dd, axis=1),
+            np.mean(jaws_prob_dd, axis=1),
+            stats.sem(npas_prob_dd, axis=1),
+            stats.sem(jaws_prob_dd, axis=1),
+            np.std(npas_prob_dd, axis=1),
+            np.std(jaws_prob_dd, axis=1),
+        ],
+        columns=jaws_feature_tables[0]["Treatment Times"],
+        index=["NPAS Avg", "JAWS Avg", "NPAS SEM", "JAWS SEM", "NPAS STD", "JAWS STD"],
+    ).to_csv(f"{save_dir}/dd_confidence_over_time.csv")
+
+    ### JAWS Feature Pre Post
+    jaws_pre_avg_treatment = np.zeros((jaws_cells, 12))  # 12 features
+    jaws_avg_treatment = np.zeros((jaws_cells, 12))  # 12 features
+    jaws_post_treatment = np.zeros((jaws_cells, 12))  # 12 features
+
+    for jc in range(jaws_cells):
+        df = jaws_feature_tables[jc]
+        df_pre = df[df["Treatment Times"].isin(pre_times)]
+        df_post = df[df["Treatment Times"].isin(post_times)]
+        df_stim = df[df["Treatment Times"].str.contains("Treatment")]
+        for col in range(12):
+            jaws_pre_avg_treatment[jc, col] = np.mean(df_pre[df_pre.columns[col]])
+            jaws_avg_treatment[jc, col] = np.mean(df_stim[df_stim.columns[col]])
+            jaws_post_treatment[jc, col] = np.mean(df_post[df_post.columns[col]])
+
+    pd.DataFrame(
+        jaws_pre_avg_treatment, columns=jaws_feature_tables[0].columns[0:12]
+    ).to_csv(f"{jaws_features_save_dir}/pre_treatment_average.csv")
+    pd.DataFrame(
+        jaws_avg_treatment, columns=jaws_feature_tables[0].columns[0:12]
+    ).to_csv(f"{jaws_features_save_dir}/treatment_average.csv")
+    pd.DataFrame(
+        jaws_post_treatment, columns=jaws_feature_tables[0].columns[0:12]
+    ).to_csv(f"{jaws_features_save_dir}/post_treatment_average.csv")
+
+    output_pre_stim_stats = []
+    output_pre_post_stats = []
+    output_stim_post_stats = []
+    output_pre_data = []
+    output_stim_data = []
+    output_post_data = []
+    output_labels = []
+    for col in range(12):
+        fig, ax = plt.subplots(1, 1, figsize=(2, 2), dpi=300, tight_layout=True)
+        output_pre_data.extend(
+            [
+                np.mean(jaws_pre_avg_treatment[:, col]),
+                stats.sem(jaws_pre_avg_treatment[:, col]),
+                np.std(jaws_pre_avg_treatment[:, col]),
+            ]
+        )
+        output_stim_data.extend(
+            [
+                np.mean(jaws_avg_treatment[:, col]),
+                stats.sem(jaws_avg_treatment[:, col]),
+                np.std(jaws_avg_treatment[:, col]),
+            ]
+        )
+        output_post_data.extend(
+            [
+                np.mean(jaws_post_treatment[:, col]),
+                stats.sem(jaws_post_treatment[:, col]),
+                np.std(jaws_post_treatment[:, col]),
+            ]
+        )
+        output_labels.extend(
+            [
+                f"{jaws_feature_tables[0].columns[col]} Avg",
+                f"{jaws_feature_tables[0].columns[col]} SEM",
+                f"{jaws_feature_tables[0].columns[col]} STD",
+            ]
+        )
+
+        output_pre_post_stats.append(
+            stats.ttest_rel(
+                jaws_pre_avg_treatment[:, col],
+                jaws_post_treatment[:, col],
+            ).pvalue
+        )
+
+        output_pre_stim_stats.append(
+            stats.ttest_rel(
+                jaws_pre_avg_treatment[:, col],
+                jaws_avg_treatment[:, col],
+            ).pvalue
+        )
+
+        output_stim_post_stats.append(
+            stats.ttest_rel(
+                jaws_post_treatment[:, col],
+                jaws_avg_treatment[:, col],
+            ).pvalue
+        )
+
+        ax.errorbar(
+            x=[0, 1, 2],
+            y=[
+                np.mean(jaws_pre_avg_treatment[:, col]),
+                np.mean(jaws_avg_treatment[:, col]),
+                np.mean(jaws_post_treatment[:, col]),
+            ],
+            yerr=[
+                stats.sem(jaws_pre_avg_treatment[:, col]),
+                stats.sem(jaws_avg_treatment[:, col]),
+                stats.sem(jaws_post_treatment[:, col]),
+            ],
+            marker="o",
+            color="k",
+            capsize=5,
+        )
+        ax.set_xticks([0, 1, 2])
+        ax.set_xticklabels(["Pre", "Stim", "Post"])
+        ax.set_ylabel(jaws_feature_tables[0].columns[col])
+        makeNice(ax)
+        fig.savefig(
+            f"{jaws_feature_plots}/{jaws_feature_tables[0].columns[col]}.pdf",
+            bbox_inches="tight",
+        )
+        plt.close()
+
+    output_pre_data.extend(
+        [
+            np.mean(jaws_prob_dd_pre),
+            stats.sem(jaws_prob_dd_pre),
+            np.std(jaws_prob_dd_pre),
+        ]
+    )
+    output_stim_data.extend(
+        [
+            np.mean(jaws_prob_dd_stim),
+            stats.sem(jaws_prob_dd_stim),
+            np.std(jaws_prob_dd_stim),
+        ]
+    )
+    output_post_data.extend(
+        [
+            np.mean(jaws_prob_dd_post),
+            stats.sem(jaws_prob_dd_post),
+            np.std(jaws_prob_dd_post),
+        ]
+    )
+    output_labels.extend(
+        [
+            f"DD Prob Avg",
+            f"DD Prob SEM",
+            f"DD Prob STD",
+        ]
+    )
+
+    output_pre_post_stats.append(
+        stats.ttest_rel(
+            jaws_prob_dd_pre,
+            jaws_prob_dd_post,
+        ).pvalue
+    )
+
+    output_pre_stim_stats.append(
+        stats.ttest_rel(
+            jaws_prob_dd_pre,
+            jaws_prob_dd_stim,
+        ).pvalue
+    )
+
+    output_stim_post_stats.append(
+        stats.ttest_rel(
+            jaws_prob_dd_stim,
+            jaws_prob_dd_post,
+        ).pvalue
+    )
+
+    cols = list(jaws_feature_tables[0].columns[0:12])
+    cols.append("DD Prob")
+
+    pd.DataFrame(
+        data=[output_pre_stim_stats, output_pre_post_stats, output_stim_post_stats],
+        columns=cols,
+        index=[
+            "Paired T-test p-value Pre vs Stim",
+            "Paired T-test p-value Pre vs Post",
+            "Paired T-test p-value Stim vs Post",
+        ],
+    ).to_csv(f"{jaws_features_save_dir}/jaws_feature_stats_summary.csv")
+    pd.DataFrame(
+        data=[output_pre_data, output_stim_data, output_post_data],
+        columns=output_labels,
+        index=["Pre", "Stim", "Post"],
+    ).to_csv(f"{jaws_features_save_dir}/jaws_feature_summary.csv")
+
+    ### NPAS Feature Pre Post
+    npas_pre_avg_treatment = np.zeros((npas_cells, 12))  # 12 features
+    npas_avg_treatment = np.zeros((npas_cells, 12))  # 12 features
+    npas_post_treatment = np.zeros((npas_cells, 12))  # 12 features
+
+    for jc in range(npas_cells):
+        df = npas_feature_tables[jc]
+        df_pre = df[df["Treatment Times"].isin(pre_times)]
+        df_post = df[df["Treatment Times"].isin(post_times)]
+        df_stim = df[df["Treatment Times"].str.contains("Treatment")]
+        for col in range(12):
+            npas_pre_avg_treatment[jc, col] = np.mean(df_pre[df_pre.columns[col]])
+            npas_avg_treatment[jc, col] = np.mean(df_stim[df_stim.columns[col]])
+            npas_post_treatment[jc, col] = np.mean(df_post[df_post.columns[col]])
+
+    pd.DataFrame(
+        npas_pre_avg_treatment, columns=npas_feature_tables[0].columns[0:12]
+    ).to_csv(f"{npas_features_save_dir}/pre_treatment_average.csv")
+    pd.DataFrame(
+        npas_avg_treatment, columns=npas_feature_tables[0].columns[0:12]
+    ).to_csv(f"{npas_features_save_dir}/treatment_average.csv")
+    pd.DataFrame(
+        npas_post_treatment, columns=npas_feature_tables[0].columns[0:12]
+    ).to_csv(f"{npas_features_save_dir}/post_treatment_average.csv")
+
+    output_pre_stim_stats = []
+    output_pre_post_stats = []
+    output_stim_post_stats = []
+    output_pre_data = []
+    output_stim_data = []
+    output_post_data = []
+    output_labels = []
+    for col in range(12):
+        fig, ax = plt.subplots(1, 1, figsize=(2, 2), dpi=300, tight_layout=True)
+        output_pre_data.extend(
+            [
+                np.mean(npas_pre_avg_treatment[:, col]),
+                stats.sem(npas_pre_avg_treatment[:, col]),
+                np.std(npas_pre_avg_treatment[:, col]),
+            ]
+        )
+        output_stim_data.extend(
+            [
+                np.mean(npas_avg_treatment[:, col]),
+                stats.sem(npas_avg_treatment[:, col]),
+                np.std(npas_avg_treatment[:, col]),
+            ]
+        )
+        output_post_data.extend(
+            [
+                np.mean(npas_post_treatment[:, col]),
+                stats.sem(npas_post_treatment[:, col]),
+                np.std(npas_post_treatment[:, col]),
+            ]
+        )
+        output_labels.extend(
+            [
+                f"{npas_feature_tables[0].columns[col]} Avg",
+                f"{npas_feature_tables[0].columns[col]} SEM",
+                f"{npas_feature_tables[0].columns[col]} STD",
+            ]
+        )
+
+        output_pre_post_stats.append(
+            stats.ttest_rel(
+                npas_pre_avg_treatment[:, col],
+                npas_post_treatment[:, col],
+            ).pvalue
+        )
+
+        output_pre_stim_stats.append(
+            stats.ttest_rel(
+                npas_pre_avg_treatment[:, col],
+                npas_avg_treatment[:, col],
+            ).pvalue
+        )
+
+        output_stim_post_stats.append(
+            stats.ttest_rel(
+                npas_post_treatment[:, col],
+                npas_avg_treatment[:, col],
+            ).pvalue
+        )
+        ax.errorbar(
+            x=[0, 1, 2],
+            y=[
+                np.mean(npas_pre_avg_treatment[:, col]),
+                np.mean(npas_avg_treatment[:, col]),
+                np.mean(npas_post_treatment[:, col]),
+            ],
+            yerr=[
+                stats.sem(npas_pre_avg_treatment[:, col]),
+                stats.sem(npas_avg_treatment[:, col]),
+                stats.sem(npas_post_treatment[:, col]),
+            ],
+            marker="o",
+            color="k",
+            capsize=5,
+        )
+        ax.set_xticks([0, 1, 2])
+        ax.set_xticklabels(["Pre", "Stim", "Post"])
+        ax.set_ylabel(npas_feature_tables[0].columns[col])
+        makeNice(ax)
+        fig.savefig(
+            f"{npas_feature_plots}/{npas_feature_tables[0].columns[col]}.pdf",
+            bbox_inches="tight",
+        )
+        plt.close()
+
+    output_pre_data.extend(
+        [
+            np.mean(npas_prob_dd_pre),
+            stats.sem(npas_prob_dd_pre),
+            np.std(npas_prob_dd_pre),
+        ]
+    )
+    output_stim_data.extend(
+        [
+            np.mean(npas_prob_dd_stim),
+            stats.sem(npas_prob_dd_stim),
+            np.std(npas_prob_dd_stim),
+        ]
+    )
+    output_post_data.extend(
+        [
+            np.mean(npas_prob_dd_post),
+            stats.sem(npas_prob_dd_post),
+            np.std(npas_prob_dd_post),
+        ]
+    )
+    output_labels.extend(
+        [
+            f"DD Prob Avg",
+            f"DD Prob SEM",
+            f"DD Prob STD",
+        ]
+    )
+
+    output_pre_post_stats.append(
+        stats.ttest_rel(
+            npas_prob_dd_pre,
+            npas_prob_dd_post,
+        ).pvalue
+    )
+
+    output_pre_stim_stats.append(
+        stats.ttest_rel(
+            npas_prob_dd_pre,
+            npas_prob_dd_stim,
+        ).pvalue
+    )
+
+    output_stim_post_stats.append(
+        stats.ttest_rel(
+            npas_prob_dd_stim,
+            npas_prob_dd_post,
+        ).pvalue
+    )
+
+    cols = list(npas_feature_tables[0].columns[0:12])
+    cols.append("DD Prob")
+
+    pd.DataFrame(
+        data=[output_pre_stim_stats, output_pre_post_stats, output_stim_post_stats],
+        columns=cols,
+        index=[
+            "Paired T-test p-value Pre vs Stim",
+            "Paired T-test p-value Pre vs Post",
+            "Paired T-test p-value Stim vs Post",
+        ],
+    ).to_csv(f"{npas_features_save_dir}/npas_feature_stats_summary.csv")
+    pd.DataFrame(
+        data=[output_pre_data, output_stim_data, output_post_data],
+        columns=output_labels,
+        index=["Pre", "Stim", "Post"],
+    ).to_csv(f"{npas_features_save_dir}/npas_feature_summary.csv")
+
+
+def create_ephys_tracked_units(fixed_length, renewal_power=False):
     jaws_spikes, jaws_light, jaws_is_medial, jaws_mouse, jaws_folder, jaws_cell_name = (
-        get_ephys_tracked_data(
-            jaws_path, f"{save_dir}/jaws_neurons/tracked_units", fixed_length
-        )
+        get_ephys_tracked_data(jaws_path, f"{save_dir}/jaws_neurons", fixed_length)
     )
 
-    npas_path = (
-        "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_pre_processed"
-    )
     npas_spikes, npas_light, npas_is_medial, npas_mouse, npas_folder, npas_cell_name = (
-        get_ephys_tracked_data(
-            npas_path, f"{save_dir}/npas_neurons/tracked_units", fixed_length
-        )
+        get_ephys_tracked_data(npas_path, f"{save_dir}/npas_neurons", fixed_length)
     )
 
-    save_spikes_light_ephys_tracked_data(
-        jaws_spikes, jaws_light, f"{save_dir}/jaws_neurons/tracked_units"
-    )
-    save_spikes_light_ephys_tracked_data(
-        npas_spikes, npas_light, f"{save_dir}/npas_neurons/tracked_units"
-    )
+    save_spikes_light_ephys_tracked_data(jaws_spikes, jaws_light, jaws_cell_save_dir)
+    save_spikes_light_ephys_tracked_data(npas_spikes, npas_light, npas_cell_save_dir)
 
     jaws_rates = calc_firing_rates_tracked(jaws_spikes, fixed_length)
     npas_rates = calc_firing_rates_tracked(npas_spikes, fixed_length)
@@ -196,8 +883,8 @@ def create_ephys_tracked_units(fixed_length):
     treatment_times = np.arange(6, 76, 7)
     x_values = [i for i in x_values if i not in treatment_times]
 
-    save_rates_ephys_tracked_data(jaws_rates, f"{save_dir}/jaws_neurons/tracked_units")
-    save_rates_ephys_tracked_data(npas_rates, f"{save_dir}/npas_neurons/tracked_units")
+    save_rates_ephys_tracked_data(jaws_rates, jaws_cell_save_dir)
+    save_rates_ephys_tracked_data(npas_rates, npas_cell_save_dir)
 
     jaws_cvs = calc_cv_tracked(jaws_spikes)
     jaws_burst_stats = calc_burst_statistics_tracked(
@@ -222,17 +909,23 @@ def create_ephys_tracked_units(fixed_length):
     run_cmd(
         '/Applications/MATLAB_R2021b.app/bin/matlab -nojvm -nodesktop -batch "get_osc_data_ephys_tracked"'
     )
-    all_jaws_data = np.zeros((jaws_rates.shape[1], 12, jaws_rates.shape[0]))
+
+    run_cmd(f"mkdir -p {jaws_features_save_dir}")
+    run_cmd(f"mkdir -p {npas_features_save_dir}")
+
+    all_jaws_data = np.zeros(
+        (jaws_rates.shape[1], 12, jaws_rates.shape[0])
+    )  # intervals, features, cells
     print(all_jaws_data.shape)
     for i in range(all_jaws_data.shape[2]):
         all_jaws_data[:, 0, i] = jaws_rates[i, :]
         all_jaws_data[:, 1, i] = jaws_cvs[i, :]
         osc = np.loadtxt(
-            f"{save_dir}/jaws_neurons/tracked_units/cell_{i+1:04d}/osc_data.txt",
+            f"{jaws_cell_save_dir}/cell_{i+1:04d}/osc_data.txt",
             delimiter=",",
         )
-        all_jaws_data[:, 2, i] = osc[:, 1]
-        all_jaws_data[:, 3, i] = osc[:, 4]
+        all_jaws_data[:, 2, i] = osc[:, 1 if renewal_power else 2]
+        all_jaws_data[:, 3, i] = osc[:, 5 if renewal_power else 6]
         count = 4
         for stat in [0, 1, 2, 3, 4, 5, 8, 9]:
             scale = 30 if stat == 0 else 1
@@ -245,11 +938,11 @@ def create_ephys_tracked_units(fixed_length):
         all_npas_data[:, 0, i] = npas_rates[i, :]
         all_npas_data[:, 1, i] = npas_cvs[i, :]
         osc = np.loadtxt(
-            f"{save_dir}/npas_neurons/tracked_units/cell_{i+1:04d}/osc_data.txt",
+            f"{npas_cell_save_dir}/cell_{i+1:04d}/osc_data.txt",
             delimiter=",",
         )
-        all_npas_data[:, 2, i] = osc[:, 1]
-        all_npas_data[:, 3, i] = osc[:, 4]
+        all_npas_data[:, 2, i] = osc[:, 1 if renewal_power else 2]
+        all_npas_data[:, 3, i] = osc[:, 5 if renewal_power else 6]
         count = 4
         for stat in [0, 1, 2, 3, 4, 5, 8, 9]:
             scale = 30 if stat == 0 else 1
@@ -283,43 +976,47 @@ def create_ephys_tracked_units(fixed_length):
 
     for k in range(all_npas_data.shape[2]):
         npas_export_df = pd.DataFrame(
-            data=all_npas_data[:, :, k], columns=col_labels, index=treatment_index
+            data=all_npas_data[:, :, k],
+            columns=col_labels,
         )
-        npas_export_df["DD Probability"] = np.loadtxt(
+        """npas_export_df["DD Probability"] = np.loadtxt(
             f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
             usecols=0,
         )
         npas_export_df["Naive Probability"] = np.loadtxt(
             f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}_probabilities.txt",
             usecols=1,
-        )
+        )"""
+        npas_export_df["Treatment Times"] = treatment_index
         npas_export_df["mouse"] = npas_mouse[k]
         npas_export_df["medial"] = npas_is_medial[k]
         npas_export_df["folder"] = npas_folder[k]
         npas_export_df["name"] = npas_cell_name[k]
         npas_export_df.to_csv(
-            f"../data/tracked_units/npas_treatment_data/npas_treatment_cell_{k+1}.csv"
+            f"{npas_features_save_dir}/npas_treatment_cell_{k+1:04d}.csv"
         )
 
     for k in range(all_jaws_data.shape[2]):
         jaws_export_df = pd.DataFrame(
-            data=all_jaws_data[:, :, k], columns=col_labels, index=treatment_index
+            data=all_jaws_data[:, :, k],
+            columns=col_labels,
         )
-        jaws_export_df["DD Probability"] = np.loadtxt(
+        """jaws_export_df["DD Probability"] = np.loadtxt(
             f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
             usecols=0,
         )
         jaws_export_df["Naive Probability"] = np.loadtxt(
             f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}_probabilities.txt",
             usecols=1,
-        )
+        )"""
 
+        jaws_export_df["Treatment Times"] = treatment_index
         jaws_export_df["mouse"] = jaws_mouse[k]
         jaws_export_df["medial"] = jaws_is_medial[k]
         jaws_export_df["folder"] = jaws_folder[k]
         jaws_export_df["name"] = jaws_cell_name[k]
         jaws_export_df.to_csv(
-            f"../data/tracked_units/jaws_treatment_data/jaws_treatment_cell_{k+1}.csv"
+            f"{jaws_features_save_dir}/jaws_treatment_cell_{k+1:04d}.csv"
         )
 
     sys.exit()
@@ -519,7 +1216,7 @@ def create_ephys_tracked_units(fixed_length):
     jaws_export_df = pd.DataFrame(
         data=jaws_treatment_data, columns=col_labels, index=treatment_index
     )
-    jaws_export_df.to_csv("data/tracked_units/jaws_treatment_data.csv")
+    jaws_export_df.to_csv("../data/tracked_units/jaws_treatment_data.csv")
 
     npas_treatment_data = np.zeros((npas_rates.shape[1], 12 * 3))
     col_labels = []
@@ -599,7 +1296,7 @@ def create_ephys_tracked_units(fixed_length):
     npas_export_df = pd.DataFrame(
         data=npas_treatment_data, columns=col_labels, index=treatment_index
     )
-    npas_export_df.to_csv("data/tracked_units/npas_treatment_data.csv")
+    npas_export_df.to_csv("../data/tracked_units/npas_treatment_data.csv")
 
     plot_sem = False
     fig, ax = plt.subplots(4, 3, figsize=(14, 10), dpi=300, tight_layout=True)
@@ -855,64 +1552,17 @@ def create_ephys_tracked_units(fixed_length):
         axes[i].set_ylim(ylims)
 
     makeNice(axes)
-    fig.savefig("data/tracked_units_features.pdf", bbox_inches="tight")
+    fig.savefig("../data/tracked_units_features.pdf", bbox_inches="tight")
     plt.close()
     run_cmd("open data/tracked_units_features.pdf ")
 
 
-def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
-    jaws_data = []
-    for i in range(jaws_units):
-        jaws_data.append(pd.read_csv(f"{jaws_path}/jaws_treatment_cell_{i+1}.csv"))
-    jaws_dd = np.zeros(76)
-    jaws_dd_prob = np.zeros(76)
-    for i in range(len(jaws_dd)):
-        for data in jaws_data:
-            jaws_dd_prob[i] += (
-                data.iloc[i, data.columns.get_loc("DD Probability")] / jaws_units
-            )
-            if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
-                jaws_dd[i] += 1 / jaws_units
-    npas_data = []
-    for i in range(npas_units):
-        npas_data.append(pd.read_csv(f"{npas_path}/npas_treatment_cell_{i+1}.csv"))
-    npas_dd = np.zeros(76)
-    npas_dd_prob = np.zeros(76)
-    for i in range(len(npas_dd)):
-        for data in npas_data:
-            npas_dd_prob[i] += (
-                data.iloc[i, data.columns.get_loc("DD Probability")] / npas_units
-            )
-            if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
-                npas_dd[i] += 1 / npas_units
-    fig, ax = plt.subplots(2, 1, figsize=(8, 4), dpi=300, tight_layout=True)
-    axes = [ax[i] for i in range(2)]
-    axes[0].plot(np.arange(76), jaws_dd, color="blue", label="JAWS DD % (23 Units)")
-    axes[0].plot(np.arange(76), npas_dd, color="red", label="Npas DD % (10 Units)")
-    axes[0].vlines(np.arange(6, 76, 7), 0, 1, color="k", linestyle="dashed")
-    axes[0].legend()
-    axes[1].plot(
-        np.arange(76), jaws_dd_prob, color="blue", label="JAWS Avg DD Probability"
-    )
-    axes[1].plot(
-        np.arange(76), npas_dd_prob, color="red", label="Npas Avg DD Probability"
-    )
-    axes[1].vlines(np.arange(6, 76, 7), 0, 1, color="k", linestyle="dashed")
-    axes[1].legend()
-    axes[0].set_xticks(np.arange(0, 76))
-    axes[0].set_xticklabels(np.arange(-180, 70 * 30, 30), rotation=90)
-    axes[1].set_xticks(np.arange(0, 76))
-    axes[1].set_xticklabels(np.arange(-180, 70 * 30, 30), rotation=90)
-    axes[0].set_ylabel("Percent DD")
-    axes[1].set_ylabel("Average DD Probability")
-    makeNice(axes, labelsize=6)
-    fig.savefig(f"data/tracked_units/dd_probabilities.pdf", bbox_inches="tight")
-    plt.close()
-    run_cmd("open data/tracked_units/dd_probabilities.pdf")
-
-
 training_fixed_length = 30
 """plot_tracked_healthy_dd(
-    "data/tracked_units/jaws_treatment_data", "data/tracked_units/npas_treatment_data"
+    "../data/tracked_units/jaws_treatment_data", "../data/tracked_units/npas_treatment_data"
 )"""
-create_ephys_tracked_units(training_fixed_length)
+
+
+# create_ephys_tracked_units(training_fixed_length)
+
+create_feature_results()
