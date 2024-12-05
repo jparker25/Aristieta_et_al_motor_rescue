@@ -25,7 +25,7 @@ import clean_data
 import plot_data
 
 
-def apply_pca(norm_df, pca):
+"""def apply_pca(norm_df, pca):
     pca_applied = np.zeros((norm_df.shape[0], pca.n_components_))
     for i in range(pca_applied.shape[0]):
         pca_applied[i, :] = [
@@ -33,38 +33,47 @@ def apply_pca(norm_df, pca):
             for k in range(pca.n_components_)
         ]
     return pca_applied
+"""
 
 
 def run_pca_for_figures(
     target_df, feature_array, outlier_dict, seeds=np.arange(5), train_amount=0.8
 ):
 
+    # Remove outliers and return new dataframe
     target_df_outliers_removed = clean_data.remove_outliers_by_group_zscore_independent(
         target_df[target_df["Type"] == 1],
         target_df[target_df["Type"] == 0],
         outlier_dict,
     )
 
+    # Create feature dataframe and grab target classifications
     feature_df = target_df_outliers_removed.iloc[:, feature_array]
     types = target_df_outliers_removed["Type"].values
 
+    # Normalize feature dataframe
     feature_df_norm, _ = clean_data.normalize_data(
         feature_df, feature_df, min_max=False
     )
-    print(feature_df_norm.shape)
 
+    # Set up and perform PCA on feature dataframe
     pca = PCA(n_components=len(feature_array))
     X_pca = pca.fit_transform(feature_df_norm)
 
+    # Color code based on classes (red DD, gray Naive)
     c = ["r" if types[i] == 0 else "gray" for i in range(len(types))]
+
+    # Create DD and Naive PCA variables
     X_pca_dd = X_pca[types == 0, :]
     X_pca_naive = X_pca[types == 1, :]
 
+    # Determine centroids from PCA
     dd_centroid = KMeans(n_clusters=1, random_state=0, n_init="auto").fit(X_pca_dd)
     naive_centroid = KMeans(n_clusters=1, random_state=0, n_init="auto").fit(
         X_pca_naive
     )
 
+    # Plot PCA color coded by true values, include centroids
     fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax.scatter(X_pca[:, 0], X_pca[:, 1], c=c, s=4)
     ax.scatter(
@@ -90,6 +99,7 @@ def run_pca_for_figures(
     plt.close()
     run_cmd("open ../data/pca/all_pre_pca.pdf")
 
+    # Detemine nearest centroid by L2 norm
     centroid_match_train = np.zeros(len(X_pca))
     for i in range(len(X_pca)):
         dd_dist = np.linalg.norm(X_pca[i, :] - dd_centroid.cluster_centers_)
@@ -97,9 +107,11 @@ def run_pca_for_figures(
         if naive_dist < dd_dist:
             centroid_match_train[i] = 1
 
+    # Print accuracy by K-means centroid clustering
     acc = accuracy_score(types, centroid_match_train)
-    print("PCA Cluster Acc:\t", acc)
+    print("PCA K-Means Cluster Acc:\t", acc)
 
+    # Plot PCA color coded by nearest centroid
     fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax.scatter(
         X_pca[:, 0],
@@ -130,6 +142,7 @@ def run_pca_for_figures(
     plt.close()
     run_cmd("open ../data/pca/all_pca_clustered.pdf")
 
+    # Read in 15 MLPs and determine class probabilities of all data points
     predicts_prob = np.zeros((len(feature_df_norm), 2))
     for seed in seeds:
         np.random.seed(seed)
@@ -138,11 +151,14 @@ def run_pca_for_figures(
 
         predicts_prob += clf.predict_proba(feature_df_norm) / len(seeds)
 
+    # Determine and print accuracy of averaged MLP probablities
     acc = accuracy_score(
         types,
         [0 if predicts_prob[i, 0] >= 0.5 else 1 for i in range(predicts_prob.shape[0])],
     )
-    print("MLP Accuracy:\t", acc)
+    print("PCA MLP Accuracy:\t", acc)
+
+    # Plot PCA color coded by MLP average probability
     fig, ax = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax.scatter(
         X_pca[:, 0],
@@ -174,6 +190,7 @@ def run_pca_for_figures(
     run_cmd("open ../data/pca/all_mlp_predictions.pdf")
 
 
+"""
 def pca_on_df(
     target_df,
     feature_array,
@@ -1224,3 +1241,4 @@ def determine_percentile_score(
         )
         healthy_score[i] = 1 - naive_score[i] / (naive_score[i] + dd_score[i])
     return naive_score, dd_score, healthy_score
+"""
