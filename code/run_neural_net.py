@@ -1255,16 +1255,17 @@ def feature_importance_clustered(
     seeds=np.arange(10),
     show=False,
 ):
+    # Remove outliers and create target data frame
     target_df = clean_data.remove_outliers_by_group_zscore_independent(
         target_df[target_df["Type"] == 1],
         target_df[target_df["Type"] == 0],
         outlier_dict,
     )
 
+    # Create feature dataframe
     feature_df = target_df.iloc[:, feature_array]
 
-    train_test_accuracy = np.zeros((len(feature_array) + 1, 2))
-
+    # Create labels for plotting
     xlabels_cluster = [
         "None",
         "Cluster I",
@@ -1276,6 +1277,7 @@ def feature_importance_clustered(
         "Cluster VII",
     ]
 
+    # values to track for cluster performance
     cluster_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
     cluster_probs_dd = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
     cluster_probs_naive = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
@@ -1286,6 +1288,7 @@ def feature_importance_clustered(
     train_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
     test_acc_scores = np.zeros((len(xlabels_cluster) + 2, len(seeds)))
 
+    # Define clusters for correlation matrix
     cluster_I = ["Delta Power"]
     cluster_II = [
         "Percent of Spikes in Bursts",
@@ -1305,6 +1308,7 @@ def feature_importance_clustered(
         "CV",
         "Burst Firing Rate Increase",
     ]
+
     except_I_II = [
         "FR",
         "Avg Burst Firing Rate",
@@ -1314,17 +1318,8 @@ def feature_importance_clustered(
         "Avg Interburst Interval",
         "Avg Burst Duration",
     ]
-    # All minus NumBursts, ClusterIII, beta
-    except_III_IV_V = [
-        "Delta Power",
-        "Percent of Spikes in Bursts",
-        "Percent Time Bursting",
-        "CV",
-        "Burst Firing Rate Increase",
-        "Avg Interburst Interval",
-        "Avg Burst Duration",
-    ]
 
+    # Create list of clusters to evaluate
     cluster_runs = [
         cluster_I,
         cluster_II,
@@ -1335,23 +1330,29 @@ def feature_importance_clustered(
         cluster_VII,
         cluster_I_II,
         except_I_II,
-        # except_III_IV_V,
     ]
 
+    # Run through all MLP seeds and all data
     run = 0
     for i in seeds:
 
+        # Set Seed
         np.random.seed(i)
+
+        # Split data
         X_train, X_test, y_train, y_test = clean_data.split_data(
             feature_df, target_df, train_amount, seed=i
         )
 
+        # Normalize training and testing data
         X_train_norm, X_test_norm = clean_data.normalize_data(
             X_train, X_test, min_max=False
         )
 
+        # Normalize entire feature dataframe
         _, all_norm = clean_data.normalize_data(X_train, feature_df, min_max=False)
 
+        # Create MLP based on seed, same hyperparameters as predict_motor_rescue MLPs
         clf = MLPClassifier(
             hidden_layer_sizes=(200, 100),
             activation="relu",
@@ -1370,7 +1371,10 @@ def feature_importance_clustered(
             n_iter_no_change=10,
         )
 
+        # Fit MLP to normalized training data
         clf.fit(X_train_norm, y_train)
+
+        # Update metrics based on seed
         cluster_acc_scores[run, i] = accuracy_score(
             target_df["Type"], clf.predict(all_norm)
         )
@@ -1394,10 +1398,9 @@ def feature_importance_clustered(
         cluster_probs_dd[run, i] = np.mean(all_probs[target_df["Type"] == 0, 0])
         cluster_probs_naive[run, i] = np.mean(all_probs[target_df["Type"] == 1, 0])
 
+    # Run through all MLP seeds and each cluster
     run += 1
-
     features = feature_df.columns
-
     for cr in cluster_runs:
         cols = []
         for i in range(len(features)):
