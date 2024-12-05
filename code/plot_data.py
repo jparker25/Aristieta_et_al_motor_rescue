@@ -21,7 +21,7 @@ mpl.rcParams["ps.fonttype"] = 42
 
 
 def plot_pre_post_boxplots(
-    jaws_npas_df, show=False, pre_times=[0, 0], post_times=[30, 210]
+    jaws_npas_df, show=False, pre_times=[0, 0], post_times=[30, 120]
 ):
     for col in jaws_npas_df.columns[0:12]:
         for mouse in ["JAWS", "NPAS"]:
@@ -46,6 +46,13 @@ def plot_pre_post_boxplots(
                 capprops={"color": "k" if mouse == "JAWS" else "purple"},
                 patch_artist=True,
             )
+            print(
+                f"{col} {mouse} Pre:\n\t Mean = {np.mean(jaws_pre[col]):.2e},\tSTD = {np.std(jaws_pre[col]):.2e},\tSEM = {scipy.stats.sem(jaws_pre[col]):.2e}"
+            )
+            print(
+                f"{col} {mouse} Post:\n\t Mean = {np.mean(jaws_post[col]):.2e},\tSTD = {np.std(jaws_post[col]):.2e},\tSEM = {scipy.stats.sem(jaws_post[col]):.2e}\n"
+            )
+
             bps["boxes"][0].set(facecolor="white")
             bps["boxes"][1].set(facecolor="gray" if mouse == "JAWS" else "mediumpurple")
 
