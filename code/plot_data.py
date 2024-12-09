@@ -47,16 +47,18 @@ def plot_pre_post_boxplots(
                 patch_artist=True,
             )
             print(
-                f"{col} {mouse} Pre:\n\t Mean = {np.mean(jaws_pre[col]):.2e},\tSTD = {np.std(jaws_pre[col]):.2e},\tSEM = {scipy.stats.sem(jaws_pre[col]):.2e}"
+                f"{col} {mouse} Pre:\n\t Mean = {np.mean(jaws_pre[col]):.3e},\tSTD = {np.std(jaws_pre[col]):.3e},\tSEM = {scipy.stats.sem(jaws_pre[col]):.3e}"
             )
             print(
-                f"{col} {mouse} Post:\n\t Mean = {np.mean(jaws_post[col]):.2e},\tSTD = {np.std(jaws_post[col]):.2e},\tSEM = {scipy.stats.sem(jaws_post[col]):.2e}\n"
+                f"{col} {mouse} Post:\n\t Mean = {np.mean(jaws_post[col]):.3e},\tSTD = {np.std(jaws_post[col]):.3e},\tSEM = {scipy.stats.sem(jaws_post[col]):.3e}"
             )
+            mwu = scipy.stats.mannwhitneyu(jaws_pre[col], jaws_post[col]).pvalue
+            print(f"Pre vs Post MWU: p{'*' if mwu < 0.05 else ''} = {mwu:.5f}\n")
 
             bps["boxes"][0].set(facecolor="white")
             bps["boxes"][1].set(facecolor="gray" if mouse == "JAWS" else "mediumpurple")
 
-            ax.set_ylabel(col)
+            ax.set_ylabel(col if col != "Num Bursts" else "Busts/s")
             ax.set_xticks([1, 2])
             ax.set_xticklabels(["Pre", "Post"])
             makeNice(ax)

@@ -785,7 +785,7 @@ def predict_motor_rescue(
 
     disp.plot(ax=axes[0], im_kw={"aspect": "auto"}, values_format=".0f")
     axes[0].set_title(
-        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f}\nPrecision: {np.mean(precisions[:,1]):.02f}, {np.mean(precisions[:,0]):.02f}\nRecall: {np.mean(recalls[:,1]):.02f}, {np.mean(recalls[:,0]):.02f}",
+        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f} +/- {np.std(accuracies[:,0],axis=0)}\nPrecision: {np.mean(precisions[:,1]):.02f}, {np.mean(precisions[:,0]):.02f}\nRecall: {np.mean(recalls[:,1]):.02f}, {np.mean(recalls[:,0]):.02f}",
         fontsize=10,
     )
 
@@ -1489,6 +1489,9 @@ def feature_importance_clustered(
         markersize=4,
         label="clusters",
     )
+
+    print(np.mean(cluster_acc_scores[:-2, :], axis=1))
+    print(scipy.stats.sem(cluster_acc_scores[:-2, :]))
 
     ax3.hlines(
         np.mean(cluster_acc_scores[-2, :]), 0, len(xlabels_cluster), lw=0.5, color="k"

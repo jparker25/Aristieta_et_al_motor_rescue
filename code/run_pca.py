@@ -144,17 +144,25 @@ def run_pca_for_figures(
 
     # Read in 15 MLPs and determine class probabilities of all data points
     predicts_prob = np.zeros((len(feature_df_norm), 2))
+    predicts_all = np.zeros(len(feature_df_norm))
     for seed in seeds:
         np.random.seed(seed)
         with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "rb") as f:
             clf = pickle.load(f)
-
+        predicts_all += clf.predict(feature_df_norm)
         predicts_prob += clf.predict_proba(feature_df_norm) / len(seeds)
 
+    print(predicts_all)
     # Determine and print accuracy of averaged MLP probablities
     acc = accuracy_score(
         types,
         [0 if predicts_prob[i, 0] >= 0.5 else 1 for i in range(predicts_prob.shape[0])],
+    )
+    print("PCA MLP Accuracy:\t", acc)
+
+    acc = accuracy_score(
+        types,
+        [1 if predicts_all[i] >= 8 else 0 for i in range(predicts_prob.shape[0])],
     )
     print("PCA MLP Accuracy:\t", acc)
 
@@ -163,7 +171,9 @@ def run_pca_for_figures(
     ax.scatter(
         X_pca[:, 0],
         X_pca[:, 1],
-        c=["r" if x[0] >= 0.5 else "gray" for x in predicts_prob],
+        c=[
+            "r" if x[0] >= 0.5 else "gray" for x in predicts_prob
+        ],  # ["r" if x < 8 else "gray" for x in predicts_all],  # ,
         s=4,
     )
     ax.scatter(
