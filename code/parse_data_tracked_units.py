@@ -1,3 +1,13 @@
+"""
+parse_data_tracked_units.py
+
+This script gathers and grabs statistics of trakced units from the ephys data. 
+It will save the data in a format that can be used for further analysis.
+
+Author: John E. Parker (2024)
+"""
+
+# python modules
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
@@ -6,17 +16,15 @@ import seaborn as sns
 import json
 from scipy import stats
 import matplotlib.patches as patches
-from PIL import Image
-import matplotlib as mpl
 import pickle
 
+# set up plotting parameters
 plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["font.sans-serif"] = ["Arial"]
 plt.rcParams["axes.labelsize"] = 8
 
 
 # user modules
-import poisson_surprise
 from helpers import *
 import parse_data
 import clean_data
@@ -38,13 +46,44 @@ neural_net = "../data/neural_net"
 
 
 def get_ephys_tracked_data(source_path, save_path, length):
+    """
+    This function will gather the ephys data from the tracked units and save it in a format that can be used for further analysis.
+
+    Parameters
+    ----------
+    \t source_path (str) : path to the source data
+
+    \t save_path (str) : path to save the data
+
+    \t length (int) : length of the time window to analyze
+
+    Returns
+    -------
+    \t all_spikes (list) : list of spikes for each cell
+
+    \t light_on_off (list) : list of light on and off times for each cell
+
+    \t is_medial (list) : list of whether the cell is medial or not
+
+    \t mouse (list) : list of mouse identifiers
+
+    \t folder (list) : list of folders
+
+    \t cell_name (list) : list of cell names
+    """
+
+    # Create path to save data
     run_cmd(f"mkdir -p {save_path}")
+
+    # Initialize lists to store data
     all_spikes = []
     light_on_off = []
     is_medial = []
     mouse = []
     cell_name = []
     folder = []
+
+    # Iterate through files and gather data
     for cell in sorted(os.listdir(f"{source_path}/pre_post_opto")):
         if cell != ".DS_Store":
             light_on = np.loadtxt(f"{source_path}/pre_post_opto/{cell}/light_on.txt")
@@ -59,6 +98,8 @@ def get_ephys_tracked_data(source_path, save_path, length):
             shift = light_on[0, 0] - length
             light_on -= shift
             spikes -= shift
+
+            # Collect spikes
             collect_spikes = []
             for i in range(6):
                 collect_spikes.append(
@@ -68,9 +109,7 @@ def get_ephys_tracked_data(source_path, save_path, length):
                     ]
                 )
 
-            """collect_spikes.append(
-                spikes[(light_on[0, 0] > spikes) & (spikes >= light_on[0, 0] - length)]
-            )"""
+            # Collect trials in spikes
             for k in range(light_on.shape[0] - 1):
                 collect_spikes.append(
                     spikes[(spikes >= light_on[k, 0]) & (spikes < light_on[k, 1])]
@@ -102,6 +141,19 @@ def get_ephys_tracked_data(source_path, save_path, length):
 
 
 def save_spikes_light_ephys_tracked_data(spikes, light_on, save_path):
+    """
+    Saves tracked unit data in a format that can be used for further analysis.
+
+    Parameters
+    ----------
+    \t spikes (list) : list of spikes for each cell
+
+    \t light_on (list) : list of light on and off times for each cell
+
+    \t save_path (str) : path to save the data
+    """
+
+    # Create path to save data
     cell_count = 1
     for cell_spikes in spikes:
         save_dir = f"{save_path}/cell_{cell_count:04d}"
@@ -115,6 +167,8 @@ def save_spikes_light_ephys_tracked_data(spikes, light_on, save_path):
             fmt="%f",
         )
         segment = 0
+
+        # save individual stim segments
         for stim_segment in cell_spikes:
             np.savetxt(
                 f"{save_dir}/spikes/segment_{segment:04d}.txt",
@@ -128,6 +182,19 @@ def save_spikes_light_ephys_tracked_data(spikes, light_on, save_path):
 
 
 def calc_firing_rates_tracked(spikes, length):
+    """
+    Calculate firing rates for tracked units.
+
+    Parameters
+    ----------
+    \t spikes (list) : list of spikes for each cell
+
+    \t length (int) : length of the time window to analyze
+
+    Returns
+    -------
+    \t rates (np.ndarray) : firing rates for each cell
+    """
     rates = []
     for cell_spikes in spikes:
         cell_rates = parse_data.calc_firing_rates(
@@ -138,6 +205,17 @@ def calc_firing_rates_tracked(spikes, length):
 
 
 def calc_cv_tracked(spikes):
+    """
+    Calculate CV from tracked cells
+
+    Parameters
+    ----------
+    \t spikes (list) : list of spikes for each cell
+
+    Returns
+    -------
+    \t cv (np.ndarray) : CV for each cell
+    """
     cv = []
     for cell_spikes in spikes:
         cell_cvs = parse_data.calc_cv(cell_spikes)
@@ -148,6 +226,27 @@ def calc_cv_tracked(spikes):
 def calc_burst_statistics_tracked(
     spikes, rates, length, min_spikes=3, surprise_threshold=3, window=0.25
 ):
+    """
+    Calculate burst statistics for tracked units.
+
+    Parameters
+    ----------
+    \t spikes (list) : list of spikes for each cell
+
+    \t rates (np.ndarray) : firing rates for each cell
+
+    \t length (int) : length of the time window to analyze
+
+    \t min_spikes=3 (int) : minimum number of spikes to be considered a burst
+
+    \t surprise_threshold=3 (int) : threshold for surprise
+
+    \t window=0.25 (float) : window for surprise
+
+    Returns
+    -------
+    \t burst_stats (np.ndarray) : burst statistics for each cell
+    """
     burst_stats = []
     count = 0
     for cell_spikes in spikes:
@@ -166,6 +265,15 @@ def calc_burst_statistics_tracked(
 
 
 def save_rates_ephys_tracked_data(rates, save_path):
+    """
+    Save firing rates for tracked data.
+
+    Parameters
+    ----------
+    \t rates (np.ndarray) : firing rates for each cell
+
+    \t save_path (str) : path to save the data
+    """
     cell_count = 0
     for rate in rates:
         np.savetxt(
@@ -179,9 +287,26 @@ def save_rates_ephys_tracked_data(rates, save_path):
 
 
 def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
+    """
+    Plot tracked units for healthy and DD cells.
+
+    Parameters
+    ----------
+    \t jaws_path (str) : path to JAWS data
+
+    \t npas_path (str) : path to NPAS data
+
+    \t jaws_units=23 (int) : number of JAWS units
+
+    \t npas_units=10 (int) : number of NPAS units
+    """
+
+    # Gather jaws data
     jaws_data = []
     for i in range(jaws_units):
         jaws_data.append(pd.read_csv(f"{jaws_path}/jaws_treatment_cell_{i+1}.csv"))
+
+    # Set up jaws data for all spike trains
     jaws_dd = np.zeros(76)
     jaws_dd_prob = np.zeros(76)
     for i in range(len(jaws_dd)):
@@ -191,9 +316,13 @@ def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
             )
             if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
                 jaws_dd[i] += 1 / jaws_units
+
+    # Gather npas data
     npas_data = []
     for i in range(npas_units):
         npas_data.append(pd.read_csv(f"{npas_path}/npas_treatment_cell_{i+1}.csv"))
+
+    # Set up npas data for all spike trains
     npas_dd = np.zeros(76)
     npas_dd_prob = np.zeros(76)
     for i in range(len(npas_dd)):
@@ -203,6 +332,8 @@ def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
             )
             if data.iloc[i, data.columns.get_loc("DD Probability")] > 0.5:
                 npas_dd[i] += 1 / npas_units
+
+    # Plot DD confidence over time
     fig, ax = plt.subplots(2, 1, figsize=(8, 4), dpi=300, tight_layout=True)
     axes = [ax[i] for i in range(2)]
     axes[0].plot(np.arange(76), jaws_dd, color="blue", label="JAWS DD % (23 Units)")
@@ -230,9 +361,15 @@ def plot_tracked_healthy_dd(jaws_path, npas_path, jaws_units=23, npas_units=10):
 
 
 def create_feature_results():
+    """
+    Create all feature results and save to file.
+    """
+
+    # Create save directories
     run_cmd(f"mkdir -p {jaws_feature_plots}")
     run_cmd(f"mkdir -p {npas_feature_plots}")
 
+    # Get JAWS data
     jaws_feature_tables = [
         pd.read_csv(
             f"{jaws_features_save_dir}/jaws_treatment_cell_{i+1:04d}.csv",
@@ -241,8 +378,10 @@ def create_feature_results():
         for i in range(jaws_cells)
     ]
 
+    # replace NaN values with 0
     [jaws_feature_tables[i].fillna(0, inplace=True) for i in range(jaws_cells)]
 
+    # Get NPAS data
     npas_feature_tables = [
         pd.read_csv(
             f"{npas_features_save_dir}/npas_treatment_cell_{i+1:04d}.csv",
@@ -251,18 +390,24 @@ def create_feature_results():
         for i in range(npas_cells)
     ]
 
+    # replace NaN values with 0
     [npas_feature_tables[i].fillna(0, inplace=True) for i in range(npas_cells)]
 
+    # Set up plotting times
     times = np.arange(-180, 30 * len(jaws_feature_tables[0]) - 180, 30)
     stim_times = np.arange(0, (10 * 210), 210)
     pre_times = [f"{x}" for x in np.arange(-30, -30 + (10 * 210), 210)]
     post_times = [f"{x}" for x in np.arange(30, 30 + (10 * 210), 210)]
 
+    # Initialize arrays
     jaws_prob_dd = np.zeros((len(jaws_feature_tables[0]), jaws_cells))
     jaws_prob_naive = np.zeros((len(jaws_feature_tables[0]), jaws_cells))
 
+    # Load MLPs and determine DD probabilities for each segment
     for jc in range(jaws_cells):
         for i in range(seeds):
+
+            # Load training data for noramlization of jaws data
             X_train = pd.read_csv(f"{neural_net}/X_train_seed_{i:02d}.csv").iloc[:, 1:]
             X_train_norm, jaws_norm = clean_data.normalize_data(
                 X_train,
@@ -270,17 +415,22 @@ def create_feature_results():
                 min_max=False,
             )
 
+            # Load neural network and determine DD probability
             with open(f"{neural_net}/MLP_seed_{i:02d}.pkl", "rb") as mlp_file:
                 mlp_clf = pickle.load(mlp_file)
                 probs = mlp_clf.predict_proba(jaws_norm) / seeds
                 jaws_prob_dd[:, jc] += probs[:, 0]
                 jaws_prob_naive[:, jc] += probs[:, 1]
 
+    # Initialize arrays
     npas_prob_dd = np.zeros((len(npas_feature_tables[0]), npas_cells))
     npas_prob_naive = np.zeros((len(npas_feature_tables[0]), npas_cells))
 
+    # Load MLPs and determine DD probabilities for each segment
     for jc in range(npas_cells):
         for i in range(seeds):
+
+            # Load training data for noramlization of npas data
             X_train = pd.read_csv(f"{neural_net}/X_train_seed_{i:02d}.csv").iloc[:, 1:]
             X_train_norm, npas_norm = clean_data.normalize_data(
                 X_train,
@@ -288,12 +438,14 @@ def create_feature_results():
                 min_max=False,
             )
 
+            # Load neural network and determine DD probability
             with open(f"{neural_net}/MLP_seed_{i:02d}.pkl", "rb") as mlp_file:
                 mlp_clf = pickle.load(mlp_file)
                 probs = mlp_clf.predict_proba(npas_norm) / seeds
                 npas_prob_dd[:, jc] += probs[:, 0]
                 npas_prob_naive[:, jc] += probs[:, 1]
 
+    # Generate average probabilities for each segment
     jaws_prob_dd_pre = np.mean(
         jaws_prob_dd[jaws_feature_tables[0]["Treatment Times"].isin(pre_times)], axis=0
     )
@@ -480,6 +632,7 @@ def create_feature_results():
         newline="\n",
     )
 
+    ### Plotting DD Confidence over time
     fig, ax = plt.subplots(1, 1, figsize=(4, 2), dpi=300, tight_layout=True)
     ax.plot(times, np.mean(jaws_prob_dd, axis=1), lw=0.5, label="JAWS")
     ax.plot(times, np.mean(npas_prob_dd, axis=1), lw=0.5, label="NPAS")
@@ -495,6 +648,7 @@ def create_feature_results():
     fig.savefig(f"{save_dir}/dd_confidence_over_time.pdf", bbox_inches="tight")
     plt.close()
 
+    # Save confidence over time
     pd.DataFrame(
         data=[
             np.mean(npas_prob_dd, axis=1),
@@ -513,6 +667,7 @@ def create_feature_results():
     jaws_avg_treatment = np.zeros((jaws_cells, 12))  # 12 features
     jaws_post_treatment = np.zeros((jaws_cells, 12))  # 12 features
 
+    # Calculate average features for each cell
     for jc in range(jaws_cells):
         df = jaws_feature_tables[jc]
         df_pre = df[df["Treatment Times"].isin(pre_times)]
@@ -523,6 +678,7 @@ def create_feature_results():
             jaws_avg_treatment[jc, col] = np.mean(df_stim[df_stim.columns[col]])
             jaws_post_treatment[jc, col] = np.mean(df_post[df_post.columns[col]])
 
+    # Save JAWS features
     pd.DataFrame(
         jaws_pre_avg_treatment, columns=jaws_feature_tables[0].columns[0:12]
     ).to_csv(f"{jaws_features_save_dir}/pre_treatment_average.csv")
@@ -533,6 +689,7 @@ def create_feature_results():
         jaws_post_treatment, columns=jaws_feature_tables[0].columns[0:12]
     ).to_csv(f"{jaws_features_save_dir}/post_treatment_average.csv")
 
+    # Initialize arrays
     output_pre_stim_stats = []
     output_pre_post_stats = []
     output_stim_post_stats = []
@@ -540,6 +697,8 @@ def create_feature_results():
     output_stim_data = []
     output_post_data = []
     output_labels = []
+
+    # Plot pre stim and post results for each feature
     for col in range(12):
         fig, ax = plt.subplots(1, 1, figsize=(2, 2), dpi=300, tight_layout=True)
         output_pre_data.extend(
@@ -618,6 +777,7 @@ def create_feature_results():
         )
         plt.close()
 
+    # Determine DD probability statistics
     output_pre_data.extend(
         [
             np.mean(jaws_prob_dd_pre),
@@ -647,6 +807,7 @@ def create_feature_results():
         ]
     )
 
+    # Run statistics on DD probabilities
     output_pre_post_stats.append(
         stats.ttest_rel(
             jaws_prob_dd_pre,
@@ -671,6 +832,7 @@ def create_feature_results():
     cols = list(jaws_feature_tables[0].columns[0:12])
     cols.append("DD Prob")
 
+    # Save summary statistics
     pd.DataFrame(
         data=[output_pre_stim_stats, output_pre_post_stats, output_stim_post_stats],
         columns=cols,
@@ -691,6 +853,7 @@ def create_feature_results():
     npas_avg_treatment = np.zeros((npas_cells, 12))  # 12 features
     npas_post_treatment = np.zeros((npas_cells, 12))  # 12 features
 
+    # Calculate average features for each cell
     for jc in range(npas_cells):
         df = npas_feature_tables[jc]
         df_pre = df[df["Treatment Times"].isin(pre_times)]
@@ -701,6 +864,7 @@ def create_feature_results():
             npas_avg_treatment[jc, col] = np.mean(df_stim[df_stim.columns[col]])
             npas_post_treatment[jc, col] = np.mean(df_post[df_post.columns[col]])
 
+    # Save NPAS features
     pd.DataFrame(
         npas_pre_avg_treatment, columns=npas_feature_tables[0].columns[0:12]
     ).to_csv(f"{npas_features_save_dir}/pre_treatment_average.csv")
@@ -711,6 +875,7 @@ def create_feature_results():
         npas_post_treatment, columns=npas_feature_tables[0].columns[0:12]
     ).to_csv(f"{npas_features_save_dir}/post_treatment_average.csv")
 
+    # Initialize arrays
     output_pre_stim_stats = []
     output_pre_post_stats = []
     output_stim_post_stats = []
@@ -718,6 +883,8 @@ def create_feature_results():
     output_stim_data = []
     output_post_data = []
     output_labels = []
+
+    # Plot pre stim and post results for each feature
     for col in range(12):
         fig, ax = plt.subplots(1, 1, figsize=(2, 2), dpi=300, tight_layout=True)
         output_pre_data.extend(
@@ -795,6 +962,7 @@ def create_feature_results():
         )
         plt.close()
 
+    # Determine DD probability statistics
     output_pre_data.extend(
         [
             np.mean(npas_prob_dd_pre),
@@ -824,6 +992,7 @@ def create_feature_results():
         ]
     )
 
+    # Run statistics on DD probabilities
     output_pre_post_stats.append(
         stats.ttest_rel(
             npas_prob_dd_pre,
@@ -848,6 +1017,7 @@ def create_feature_results():
     cols = list(npas_feature_tables[0].columns[0:12])
     cols.append("DD Prob")
 
+    # Save summary statistics
     pd.DataFrame(
         data=[output_pre_stim_stats, output_pre_post_stats, output_stim_post_stats],
         columns=cols,
@@ -865,6 +1035,17 @@ def create_feature_results():
 
 
 def create_ephys_tracked_units(fixed_length, renewal_power=False):
+    """
+    Create and plot tracked units for ephys data.
+
+    Parameters
+    ----------
+    \t fixed_length (int) : fixed length of the time window
+
+    \t renewal_power=False (bool) : whether to use renewal power
+    """
+
+    # Create save directories and gather data
     jaws_spikes, jaws_light, jaws_is_medial, jaws_mouse, jaws_folder, jaws_cell_name = (
         get_ephys_tracked_data(jaws_path, f"{save_dir}/jaws_neurons", fixed_length)
     )
@@ -873,9 +1054,11 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
         get_ephys_tracked_data(npas_path, f"{save_dir}/npas_neurons", fixed_length)
     )
 
+    # Save data
     save_spikes_light_ephys_tracked_data(jaws_spikes, jaws_light, jaws_cell_save_dir)
     save_spikes_light_ephys_tracked_data(npas_spikes, npas_light, npas_cell_save_dir)
 
+    # Calculate firing rates, CVs, and burst statistics
     jaws_rates = calc_firing_rates_tracked(jaws_spikes, fixed_length)
     npas_rates = calc_firing_rates_tracked(npas_spikes, fixed_length)
 
@@ -906,13 +1089,16 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
         window=2,
     )
 
+    # Run oscillation code
     run_cmd(
         '/Applications/MATLAB_R2021b.app/bin/matlab -nojvm -nodesktop -batch "get_osc_data_ephys_tracked"'
     )
 
+    # Create save directories
     run_cmd(f"mkdir -p {jaws_features_save_dir}")
     run_cmd(f"mkdir -p {npas_features_save_dir}")
 
+    # Gather data and reformat for saving
     all_jaws_data = np.zeros(
         (jaws_rates.shape[1], 12, jaws_rates.shape[0])
     )  # intervals, features, cells
@@ -949,6 +1135,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
             all_npas_data[:, count, i] = npas_burst_stats[i, :, stat] / scale
             count += 1
 
+    # Set up treatment index for saving
     treat = 1
     treatment_index = []
     for i in range(jaws_rates.shape[1]):
@@ -959,6 +1146,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
             treat += 1
     treatment_index = np.asarray(treatment_index)
 
+    # Feature labels
     col_labels = [
         "FR",
         "CV",
@@ -974,6 +1162,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
         "Burst Firing Rate Increase",
     ]
 
+    # Save data
     for k in range(all_npas_data.shape[2]):
         npas_export_df = pd.DataFrame(
             data=all_npas_data[:, :, k],
@@ -996,6 +1185,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
             f"{npas_features_save_dir}/npas_treatment_cell_{k+1:04d}.csv"
         )
 
+    # Save data
     for k in range(all_jaws_data.shape[2]):
         jaws_export_df = pd.DataFrame(
             data=all_jaws_data[:, :, k],
@@ -1021,6 +1211,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
 
     sys.exit()
 
+    # Load data
     delta_jaws = np.zeros(jaws_rates.shape)
     beta_jaws = np.zeros(jaws_rates.shape)
     for k in range(jaws_rates.shape[0]):
@@ -1041,6 +1232,7 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
         delta_npas[k, :] = osc[:, 1]
         beta_npas[k, :] = osc[:, 4]
 
+    # Save data
     jaws_treatment_data = np.zeros((jaws_rates.shape[1], 12 * 3))
     col_labels = []
     ### EXPORT MEANS ####
@@ -1455,26 +1647,6 @@ def create_ephys_tracked_units(fixed_length, renewal_power=False):
 
     axis_count = 4
     for stat in [0, 1, 2, 3, 4, 5, 8, 9]:
-        """axes[axis_count].plot(
-            x_values,
-            np.mean(jaws_burst_stats[:, x_values, stat], axis=0),
-            marker="o",
-            color="b",
-            ls="dashed",
-            lw=0.5,
-            markersize=2,
-            alpha=0.25,
-        )
-        axes[axis_count].plot(
-            x_values,
-            np.mean(npas_burst_stats[:, x_values, stat], axis=0),
-            marker="o",
-            color="r",
-            ls="dashed",
-            lw=0.5,
-            markersize=2,
-            alpha=0.25,
-        )"""
         sns.regplot(
             x=x_values,
             y=np.mean(jaws_burst_stats[:, x_values, stat], axis=0),
