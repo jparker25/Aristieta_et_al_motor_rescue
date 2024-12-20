@@ -328,9 +328,9 @@ for col in combined_df.columns:
     count += 1
 
 # Determine which analyses to run
-mlp = False
-pca = True
-feature_removal = False
+mlp = True
+pca = False
+feature_removal = True
 
 # Seeds (15) and train/test split (0.8)
 num_seeds = 15
@@ -348,7 +348,6 @@ if mlp:
         seeds=np.arange(num_seeds),
         show=False,
         test_outliers=False,
-        nonlinear_transforms=False,
         min_max_scale=False,
     )
 
@@ -366,49 +365,3 @@ if pca:
     run_pca.run_pca_for_figures(
         combined_df, feature_array, feature_outlier_strength, seeds=np.arange(num_seeds)
     )
-
-
-### ARCHIVED ###
-
-
-def generate_post_dataframes(dataframe, times, time_chunks, is_medial):
-    """
-    Splits dataframe a list of dataframes based on list of groups of times.
-
-    Arguments
-    ---------
-    jaws_npas_df : pandas dataframe
-        Release date in string format.
-
-    time_chunks : list
-        List of lists of times to split dataframe
-
-    Returns
-    -------
-    List of dataframes
-        Integer difference in days.
-    """
-    dataframe["Post-Time"] = times
-    dataframe["Medial"] = is_medial
-    dataframe = dataframe.sort_values(by="Post-Time")
-    chunked_data = []
-    for i in range(len(time_chunks)):
-        if type(time_chunks[i]) is not list:
-            start_index = dataframe["Post-Time"].searchsorted(
-                time_chunks[i], side="left"
-            )
-            stop_index = dataframe["Post-Time"].searchsorted(
-                time_chunks[i], side="right"
-            )
-
-            chunked_data.append(dataframe.iloc[start_index:stop_index, :])
-        else:
-            start_index = dataframe["Post-Time"].searchsorted(
-                time_chunks[i][0], side="left"
-            )
-            stop_index = dataframe["Post-Time"].searchsorted(
-                time_chunks[i][-1], side="right"
-            )
-            chunked_data.append(dataframe.iloc[start_index:stop_index, :])
-
-    return chunked_data

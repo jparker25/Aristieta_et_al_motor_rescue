@@ -1,21 +1,28 @@
+"""
+plot_data.py
+
+Different plotting functions for the data analysis of the motor rescue project.
+
+Author: John E. Parker (2024)
+"""
+
+# python modules
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
-from sklearn.decomposition import PCA
-import os, sys
 from scipy.stats import ks_2samp
 from scipy import stats
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
 from matplotlib.gridspec import GridSpec
 from matplotlib import gridspec
 
+# user modules
 from helpers import *
 import scipy.stats
 import matplotlib as mpl
 import clean_data
 
+# Set plotting parameters
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 
@@ -23,8 +30,27 @@ mpl.rcParams["ps.fonttype"] = 42
 def plot_pre_post_boxplots(
     jaws_npas_df, show=False, pre_times=[0, 0], post_times=[30, 120]
 ):
+    """
+    Plots features as boxplots for JAWS and NPAS mice pre and post stimulation.
+
+    Parameters
+    ----------
+    \t jaws_npas_df (dataframe) : dataframe containing all features for JAWS and NPAS mice
+
+    \t show=False (bool) : whether to show the plot
+
+    \t pre_times=[0, 0] (list) : time range for pre-stimulation data
+
+    \t post_times=[30, 120] (list) : time range for post-stimulation data
+    """
+
+    # Loop through all features and plot boxplots for JAWS and NPAS mice
     for col in jaws_npas_df.columns[0:12]:
+
+        # Loop through JAWS and NPAS mice
         for mouse in ["JAWS", "NPAS"]:
+
+            # Create figure and axis
             fig, ax = plt.subplots(1, 1, figsize=(1.5, 2), dpi=300, tight_layout=True)
             jaws_pre = jaws_npas_df[
                 (jaws_npas_df["mouse"] == mouse)
@@ -46,6 +72,8 @@ def plot_pre_post_boxplots(
                 capprops={"color": "k" if mouse == "JAWS" else "purple"},
                 patch_artist=True,
             )
+
+            # Print statistics
             print(
                 f"{col} {mouse} Pre:\n\t Mean = {np.mean(jaws_pre[col]):.3e},\tSTD = {np.std(jaws_pre[col]):.3e},\tSEM = {scipy.stats.sem(jaws_pre[col]):.3e}"
             )
@@ -55,6 +83,7 @@ def plot_pre_post_boxplots(
             mwu = scipy.stats.mannwhitneyu(jaws_pre[col], jaws_post[col]).pvalue
             print(f"Pre vs Post MWU: p{'*' if mwu < 0.05 else ''} = {mwu:.5f}\n")
 
+            # Set box colors
             bps["boxes"][0].set(facecolor="white")
             bps["boxes"][1].set(facecolor="gray" if mouse == "JAWS" else "mediumpurple")
 

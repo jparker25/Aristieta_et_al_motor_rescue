@@ -1,23 +1,25 @@
+"""
+run_neural_net.py
+
+This script trains a neural network to predict motor rescue from a set of features and tests what features contribute the most.
+
+Author: John E. Parker
+"""
+
+# python modules
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
-from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import accuracy_score
-import matplotlib.gridspec as gridspec
-from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.inspection import permutation_importance
-import sys
 import scipy.stats
 import matplotlib as mpl
 import pickle
 
+# set plotting parameters
 mpl.rcParams["pdf.fonttype"] = 42
 mpl.rcParams["ps.fonttype"] = 42
 
@@ -31,32 +33,62 @@ def predict_motor_rescue(
     feature_array,
     outlier_dict,
     jaws_npas_pre_post,
-    time_chunks=[[0], [30], [60], [90, 120], [150, 180, 210]],
     train_amount=0.8,
-    seeds=np.arange(5),
+    seeds=np.arange(15),
     show=False,
     test_outliers=False,
-    nonlinear_transforms=False,
     min_max_scale=False,
 ):
+    """
+    Generates a neural network to predict motor rescue from a set of features to determine binary classification. Creates plots to display results.
+
+    Parameters
+    ----------
+    \t target_df (dataframe): dataframe containing the target data
+
+    \t feature_array (list): list of columns to use as features
+
+    \t outlier_dict (dict): dictionary containing the outlier thresholds for features
+
+    \t jaws_npas_pre_post (list): list of dataframes containing the JAWS and NPAS data
+
+    \t train_amount=0.8 (float): proportion of data to use for training
+
+    \t seeds=np.arange(15) (list): list of random seeds to use for training
+
+    \t show=False (bool): whether to show the plots
+
+    \t test_outliers=False (bool): whether to test the outliers
+
+    \t min_max_scale=False (bool): whether to use min-max scaling
+    """
+
+    # Remove outliers
     target_df_outliers_removed = clean_data.remove_outliers_by_group_zscore_independent(
         target_df[target_df["Type"] == 1],
         target_df[target_df["Type"] == 0],
         outlier_dict,
     )
+
+    # Get features
     feature_df = target_df_outliers_removed.iloc[:, feature_array]
 
+    # Remove outliers
     target_df_outliers = target_df.loc[
         ~target_df.index.isin(target_df_outliers_removed.index)
     ]
+
+    # Get outliers
     y_outliers = target_df_outliers["Type"]
     target_df_outliers = target_df_outliers.drop(columns="Type")
 
+    # Drop columns
     jaws_npas_pre_post_dropped = [
         x.drop(columns=["mouse", "folder", "name", "Post-Time", "Medial"])
         for x in jaws_npas_pre_post
     ]
 
+    # Initialize variables
     jaws_npas_pre_post_predicts = [
         np.zeros((len(seeds), 4)) for x in jaws_npas_pre_post
     ]  # jaws predicted dd, jaws predicted naive, npas predicted dd, npas predicted naive
@@ -81,23 +113,28 @@ def predict_motor_rescue(
     cm_train = np.zeros((2, 2))
     cm_test = np.zeros((2, 2))
 
+    # Initialize histogram counts
     conf_thres = 0.75
     nbins = 20
     histogram_counts_dd = np.zeros((len(feature_df.columns), nbins))
     histogram_counts_naive = np.zeros((len(feature_df.columns), nbins))
 
+    # Loop through seeds
     run = 0
     for seed in seeds:
         np.random.seed(seed)
 
+        # Split data
         X_train, X_test, y_train, y_test = clean_data.split_data(
             feature_df, target_df_outliers_removed, train_amount, seed=seed
         )
 
+        # Add outliers to test set
         if test_outliers:
             X_test = pd.concat([X_test, target_df_outliers])
             y_test = pd.concat([y_test, y_outliers])
 
+        # Normalize data
         outliers_norm = clean_data.normalize_data(
             X_train, target_df_outliers, min_max=min_max_scale
         )[1]
@@ -113,6 +150,7 @@ def predict_motor_rescue(
             for i in range(len(jaws_npas_pre_post_dropped))
         ]
 
+        # Initialize network
         clf = MLPClassifier(
             hidden_layer_sizes=(200, 100),
             activation="relu",
@@ -134,9 +172,11 @@ def predict_motor_rescue(
         # Train network
         clf.fit(X_train_norm, y_train)
 
+        # Save network
         with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "wb") as f:
             pickle.dump(clf, f)
 
+        # Save training data
         X_train.to_csv(f"../data/neural_net/X_train_seed_{seed:02d}.csv")
 
         # Get network statistics
@@ -145,6 +185,7 @@ def predict_motor_rescue(
         probs_train = clf.predict_proba(X_train_norm)
         probs_test = clf.predict_proba(X_test_norm)
 
+        # Update histograms
         col_count = 0
         for col in feature_df.columns:
             bins = np.histogram_bin_edges(target_df_outliers_removed[col], nbins)
@@ -156,8 +197,10 @@ def predict_motor_rescue(
             )[0] / len(seeds)
             col_count += 1
 
+        # Update outlier probabilities
         outlier_probabilities += clf.predict_proba(outliers_norm) / len(seeds)
 
+        # Update accuracies
         accuracies[run, 0] = accuracy_score(y_train, predicts_train)
         accuracies[run, 1] = accuracy_score(y_test, predicts_test)
         precisions[run, :2], recalls[run, :2], _, _ = precision_recall_fscore_support(
@@ -364,6 +407,7 @@ def predict_motor_rescue(
 
         run += 1
 
+    # Plot results
     jaws_probs = [
         np.mean(jaws_npas_pre_post_probs[i][:, :, 0], axis=1)
         for i in range(len(jaws_npas_pre_post_probs))
@@ -505,7 +549,7 @@ def predict_motor_rescue(
     fig.savefig(f"../data/features_vs_prob_jaws.pdf", bbox_inches="tight")
     plt.close()
 
-    # sys.exit()
+    # Save data
     time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
     for i in range(len(jaws_npas_pre_post_probs)):
         np.savetxt(
@@ -541,6 +585,7 @@ def predict_motor_rescue(
             jaws_npas_pre_post_probs[i][:, :, 1], axis=0
         )
 
+    # Plot results
     fig, ax = plt.subplots(2, 2, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(2) for j in range(2)]
     count = 0
@@ -620,6 +665,7 @@ def predict_motor_rescue(
     fig.savefig("../data/neural_net/jaws_npas_summary.pdf", bbox_inches="tight")
     plt.close()
 
+    # Save data
     np.savetxt(
         "../data/neural_net/jaws_pre_post_summary.csv",
         jaws_probs_all,
@@ -645,6 +691,7 @@ def predict_motor_rescue(
         scipy.stats.sem(accuracies, axis=0),
     )
 
+    # Plot histograms
     fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(4) for j in range(3)]
     count = 0
@@ -715,6 +762,7 @@ def predict_motor_rescue(
     fig.savefig("../data/conf_thres_features.pdf", bbox_inches="tight")
     plt.close()
 
+    # Plot outliers
     outliers_correct_naive = target_df_outliers.loc[
         (outlier_probabilities[:, 1] > 0.5) & (y_outliers == 1), :
     ]
@@ -768,6 +816,7 @@ def predict_motor_rescue(
     fig.savefig("../data/neural_net/outliers_heatmaps.pdf")
     plt.close()
 
+    # Plot training results (confusion matrix)
     fig, ax = plt.subplots(3, 2, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(3) for j in range(2)]
 
@@ -801,6 +850,7 @@ def predict_motor_rescue(
     )
     plt.close()
 
+    # Plot testing results (confusion matrix)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm_test, display_labels=[0, 1])
     disp.plot(ax=axes[1], im_kw={"aspect": "auto"}, values_format=".0f")
     axes[1].set_title(
@@ -827,6 +877,7 @@ def predict_motor_rescue(
     )
     plt.close()
 
+    # Plot JAWS and NPAS results
     jaws_predicts = np.array(
         [jaws_npas_pre_post_predicts[i][:, 0] for i in range(len(jaws_npas_pre_post))]
     )
@@ -848,6 +899,7 @@ def predict_motor_rescue(
         newline="\n",
     )
 
+    # Plot predicted DD percentages
     axes[2].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
@@ -882,6 +934,7 @@ def predict_motor_rescue(
         marker="o",
     )
 
+    # Plot predicted DD percentages for medial units
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
@@ -918,6 +971,7 @@ def predict_motor_rescue(
         ls="dashed",
     )
 
+    # Plot predicted DD percentages for non medial units
     axes[3].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         [
@@ -954,6 +1008,7 @@ def predict_motor_rescue(
         ls="dotted",
     )
 
+    # Plot DD confidence for JAWS and NPAS
     axes[4].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         np.mean(
@@ -1020,6 +1075,7 @@ def predict_motor_rescue(
         marker="o",
     )
 
+    # Plot DD confidence for medial units
     axes[5].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         np.mean(
@@ -1100,6 +1156,7 @@ def predict_motor_rescue(
         ls="dashed",
     )
 
+    # Plot DD confidence for non medial units
     axes[5].errorbar(
         np.arange(len(jaws_npas_pre_post)),
         np.mean(
@@ -1180,15 +1237,18 @@ def predict_motor_rescue(
         ls="dotted",
     )
 
+    # Adjust legends
     axes[2].legend(fancybox=False, frameon=False, fontsize=6)
     axes[3].legend(fancybox=False, frameon=False, fontsize=6, ncols=2)
 
+    # Set axis labels
     for i in range(2):
         axes[i].set_xticks([0, 1])
         axes[i].set_xticklabels(["Depleted", "Control"])
         axes[i].set_yticks([0, 1])
         axes[i].set_yticklabels(["Depleted", "Control"])
 
+    # Set axis labels
     for i in [2, 3, 4, 5]:
         axes[i].set_ylabel("Predicted DD %" if i < 4 else "DD Confidence")
         axes[i].set_xticks([0, 1, 2, 3])
@@ -1231,6 +1291,8 @@ def predict_motor_rescue(
         bbox_inches="tight",
     )
     plt.close()
+
+    # Show plots
     if show:
         run_cmd("open ../data/neural_net/motor_rescue_conf_mat.pdf")
         run_cmd("open ../data/neural_net/conf_mat_train.pdf")
@@ -1245,9 +1307,27 @@ def feature_importance_clustered(
     feature_array,
     outlier_dict,
     train_amount,
-    seeds=np.arange(10),
+    seeds=np.arange(15),
     show=False,
 ):
+    """
+    Determine important features for MLP networks
+
+    Parameters
+    ----------
+    \t target_df (dataframe): dataframe containing the target data
+
+    \t feature_array (list): list of columns to use as features
+
+    \t outlier_dict (dict): dictionary containing the outlier thresholds for features
+
+    \t train_amount=0.8 (float): proportion of data to use for training
+
+    \t seeds=np.arange(15) (list): list of random seeds to use for training
+
+    \t show=False (bool): whether to show the plots
+    """
+
     # Remove outliers and create target data frame
     target_df = clean_data.remove_outliers_by_group_zscore_independent(
         target_df[target_df["Type"] == 1],
@@ -1372,6 +1452,7 @@ def feature_importance_clustered(
             target_df["Type"], clf.predict(all_norm)
         )
 
+        # Update metrics based on seed
         train_acc_scores[run, i] = accuracy_score(y_train, clf.predict(X_train_norm))
 
         test_acc_scores[run, i] = accuracy_score(y_test, clf.predict(X_test_norm))
@@ -1396,10 +1477,13 @@ def feature_importance_clustered(
     features = feature_df.columns
     for cr in cluster_runs:
         cols = []
+
+        # Get columns to remove
         for i in range(len(features)):
             if features[i] not in cr:
                 cols.append(i)
 
+        # Create temporary dataframes
         tmp_feature_df = pd.concat(
             [
                 target_df.iloc[:, cols],  # target_df.iloc[:, [entry]],  #
@@ -1410,20 +1494,26 @@ def feature_importance_clustered(
             [target_df],
         )
 
+        # Run through all MLP seeds
         for i in seeds:
             np.random.seed(i)
+
+            # Split data
             X_train, X_test, y_train, y_test = clean_data.split_data(
                 tmp_feature_df, tmp_target_df, train_amount, seed=i
             )
 
+            # Normalize training and testing data
             X_train_norm, X_test_norm = clean_data.normalize_data(
                 X_train, X_test, min_max=False
             )
 
+            # Normalize entire feature dataframe
             _, all_norm = clean_data.normalize_data(
                 X_train, tmp_feature_df, min_max=False
             )
 
+            # Create MLP based on seed, same hyperparameters as predict_motor_rescue MLPs
             clf = MLPClassifier(
                 hidden_layer_sizes=(200, 100),
                 activation="relu",
@@ -1442,8 +1532,10 @@ def feature_importance_clustered(
                 n_iter_no_change=10,
             )
 
+            # Fit MLP to normalized training data
             clf.fit(X_train_norm, y_train)
 
+            # Update metrics based on seed
             cluster_acc_scores[run, i] = accuracy_score(
                 tmp_target_df["Type"], clf.predict(all_norm)
             )
@@ -1470,6 +1562,7 @@ def feature_importance_clustered(
             cluster_probs_naive[run, i] = np.mean(all_probs[target_df["Type"] == 1, 0])
         run += 1
 
+    # Plot accuracy scores of clusters
     fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax3.errorbar(
         np.arange(len(xlabels_cluster)),
@@ -1509,6 +1602,7 @@ def feature_importance_clustered(
     )
     plt.close()
 
+    # Plot DD probabilitie scores of clusters
     fig3, ax3 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
     ax3.errorbar(
         np.arange(len(xlabels_cluster)),
@@ -1537,6 +1631,52 @@ def feature_importance_clustered(
     makeNice(ax3)
     fig3.savefig(
         f"../data/neural_net/probs_train_test_removal_clustered.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    # Rearrange features for correlation matrix
+    feature_df = feature_df[
+        [
+            "Delta Power",
+            "Percent of Spikes in Bursts",
+            "Percent Time Bursting",
+            "CV",
+            "Burst Firing Rate Increase",
+            "Num Bursts",
+            "FR",
+            "Avg Burst Firing Rate",
+            "Non Bursting Firing Rate",
+            "Beta Power",
+            "Avg Interburst Interval",
+            "Avg Burst Duration",
+        ]
+    ]
+
+    # Plot correlation matrix
+    corr_mat = feature_df.corr()
+    fig2, ax2 = plt.subplots(1, 1, figsize=(3, 3), dpi=300, tight_layout=True)
+    sns.heatmap(
+        corr_mat,  # feature_df.corr(),
+        cmap="coolwarm",
+        ax=ax2,
+        vmin=-1,
+        vmax=1,
+        fmt=".2f",
+        annot=False,
+        annot_kws={"fontsize": 4},
+        # mask=np.triu(feature_df.corr()),
+        # cbar_kws={"shrink": 0.5},
+        cbar=True,
+        cbar_kws={"orientation": "vertical"},
+    )
+    makeNice(ax2)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+    ax2.set_xticks([])
+    ax2.set_yticks([])
+    fig2.savefig(
+        f"../data/neural_net/corr_mat_single_plot2.pdf",
         bbox_inches="tight",
     )
     plt.close()
