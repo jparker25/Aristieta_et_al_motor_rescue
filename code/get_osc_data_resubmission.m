@@ -23,15 +23,10 @@ for direc = 1:length(direcs)
     spike_files = dir(fullfile(sprintf('../resub_data/%s/spikes/*.txt',direcs(direc))));
     recording_lengths = importdata(sprintf('../resub_data/%s/cell_lengths.txt',direcs(direc)));
     firing_rates = importdata(sprintf('../resub_data/%s/cell_frs.txt',direcs(direc)));
-    firing_rates(1)
     
     output_data = zeros(length(spike_files),8); %  (1) delta osc, (2) renewal power, (3) reg power, (4) peak_freq, (5) beta osc, (6) renewal power, (7) reg power, (8) peak freq
 
     for i = 1:length(spike_files)
-        i
-        if i == 31
-            i*2
-        end
         if firing_rates(i) >= min_rate && recording_lengths(i) >= min_length
             spikes = importdata(sprintf("../resub_data/%s/spikes/%s",direcs(direc),spike_files(i).name));
             % Check delta osc

@@ -45,7 +45,6 @@ def read_in_npas_uni_DD():
             # Loop through all experiments
             for exp in os.listdir(f"{direc}/{mouse}"):
                 if exp != ".DS_Store":
-                    print(exp)
                     # Extract distance from experiment name
                     distance = exp.split("_")
                     dist_index = 0
@@ -267,34 +266,37 @@ def read_in_npas_uni_DD():
                     elif "post" not in exp and "opto" not in exp:
                         # Loop through all columns
                         for csv_path in os.listdir(f"{direc}/{mouse}/{exp}"):
-                            csv = pd.read_csv(f"{direc}/{mouse}/{exp}/{csv_path}")
-                            for col in csv.columns:
-                                # Grab values and remove NaNs
-                                spikes = csv[col].values[~np.isnan(csv[col].values)]
+                            if csv_path != ".DS_Store":
+                                csv = pd.read_csv(f"{direc}/{mouse}/{exp}/{csv_path}")
+                                for col in csv.columns:
+                                    # Grab values and remove NaNs
+                                    spikes = csv[col].values[~np.isnan(csv[col].values)]
 
-                                # Set spike times from 0 to 200
-                                spikes = spikes - np.floor(np.min(csv.iloc[0, :]))
+                                    # Set spike times from 0 to 200
+                                    spikes = spikes - np.floor(np.min(csv.iloc[0, :]))
 
-                                # Save pre opto data
-                                pre_opto_cell_count += 1
-                                cell_direc = f"{save_direc}/pre_opto/Neuron_{pre_opto_cell_count:04d}"
-                                run_cmd(f"mkdir -p {cell_direc}", print_out=False)
-                                meta_data = {
-                                    "mouse": mouse,
-                                    "folder": exp,
-                                    "cell_name": col,
-                                    "type": "npas_uni_dd",
-                                    "medial": medial,
-                                }
-                                with open(f"{cell_direc}/meta_data.txt", "w") as file:
-                                    json.dump(meta_data, file)
-                                np.savetxt(
-                                    f"{cell_direc}/spikes.txt",
-                                    spikes,
-                                    fmt="%f",
-                                    newline="\n",
-                                    delimiter=",",
-                                )
+                                    # Save pre opto data
+                                    pre_opto_cell_count += 1
+                                    cell_direc = f"{save_direc}/pre_opto/Neuron_{pre_opto_cell_count:04d}"
+                                    run_cmd(f"mkdir -p {cell_direc}", print_out=False)
+                                    meta_data = {
+                                        "mouse": mouse,
+                                        "folder": exp,
+                                        "cell_name": col,
+                                        "type": "npas_uni_dd",
+                                        "medial": medial,
+                                    }
+                                    with open(
+                                        f"{cell_direc}/meta_data.txt", "w"
+                                    ) as file:
+                                        json.dump(meta_data, file)
+                                    np.savetxt(
+                                        f"{cell_direc}/spikes.txt",
+                                        spikes,
+                                        fmt="%f",
+                                        newline="\n",
+                                        delimiter=",",
+                                    )
                     # If not pre-opto, post-opto, or pre-post opto, then missed
                     else:
                         missed_folders.append([mouse, exp])
@@ -334,7 +336,6 @@ def read_in_pv_bilateral_dd():
             # Loop through all experiments
             for exp in os.listdir(f"{direc}/{mouse}"):
                 if exp != ".DS_Store":
-                    print(exp)
                     # Extract distance from experiment name
                     distance = exp.split("_")
                     dist_index = 0
