@@ -10,6 +10,7 @@ Author: John E. Parker (2024)
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+import sys
 
 # user modules
 import run_pca
@@ -225,7 +226,7 @@ def get_jaws_npas_data_set():
 
 
 def generate_pre_post_dataframes(
-    jaws_npas_df, time_chunks=[[0], [30], [60], [90, 120], [150, 180, 210]]
+    jaws_npas_df, time_chunks=[[0], [30], [60], [90, 120]]
 ):
     """
     Splits dataframe a list of dataframes based on list of groups of times.
@@ -251,6 +252,7 @@ naive_df, dd_df, df = get_naive_dd_training_data_set()
 
 # get npas and jaws data sets, chunk into list of data frames pre and post
 jaws_npas_df = get_jaws_npas_data_set()
+jaws_npas_df.to_csv("/Users/johnparker/Desktop/jaws_npas_pre_post.csv")
 jaws_npas_pre_post = generate_pre_post_dataframes(jaws_npas_df)
 
 # combine pre data for jaws and npas to training data
@@ -313,11 +315,15 @@ use_feature = {
     "name": False,  # Must be false
 }
 
+
+plot_data.feature_time_medial(jaws_npas_pre_post[0:4], show=False)
+
 # Plots feature histgorams and CDFs of training data
 plot_data.plot_feature_histograms_separate(combined_df, feature_outlier_strength)
 
 # Plots feature Box plots and prints out MWU results for pre v post comparisons
 plot_data.plot_pre_post_boxplots(jaws_npas_df, show=False)
+
 
 ### GATHER THE FEATURES IN AN ARRAY ###
 feature_array = []
@@ -330,7 +336,7 @@ for col in combined_df.columns:
 # Determine which analyses to run
 mlp = True
 pca = False
-feature_removal = True
+feature_removal = False
 
 # Seeds (15) and train/test split (0.8)
 num_seeds = 15
@@ -343,7 +349,7 @@ if mlp:
         combined_df,
         feature_array,
         feature_outlier_strength,
-        jaws_npas_pre_post,
+        jaws_npas_pre_post[0:4],
         train_amount=training_split,
         seeds=np.arange(num_seeds),
         show=False,
