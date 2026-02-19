@@ -8,10 +8,16 @@ Author: John E. Parker (2024)
 
 import numpy as np
 import json
+import pandas as pd
+import pickle
+import sys
+from matplotlib import pyplot as plt
+import seaborn as sns
 
 # user modules
 import poisson_surprise
 from helpers import *
+import clean_data
 
 #### GLOBAL VARIABLES ####
 
@@ -20,6 +26,10 @@ npas_unilateral = (
     "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_unidd_pre_processed"
 )
 pv_bilateral = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/pv_bilateral_dd_pre_processed"
+
+npas_bilateral = (
+    "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_bidd_pre_processed"
+)
 
 # length of spike trains to analyze
 fixed_length = 30
@@ -454,12 +464,211 @@ def create_ephys_training_data(fixed_length):
 
     get_ephys_data(npas_unilateral, f"{save_dir}/npas_uni_dd_neurons", fixed_length)
     get_ephys_data(pv_bilateral, f"{save_dir}/pv_bilateral_dd_neurons", fixed_length)
+    get_ephys_data(
+        npas_bilateral, f"{save_dir}/npas_bilateral_dd_neurons", fixed_length
+    )
 
     run_cmd(
         "/Applications/MATLAB_R2021b.app/bin/matlab -nojvm -nodesktop -batch 'get_osc_data_resubmission'"
     )
 
 
+def process_resub_data(renewal_power=False, mlp_seeds=15):
+    # Define paths for JAWS and NPAS data
+    source_path = "../resub_data"
+    dataframes = []
+    paths = [
+        "npas_uni_dd_neurons/pre_opto",
+        "npas_uni_dd_neurons/post_opto",
+        "pv_bilateral_dd_neurons/pre_opto",
+        "pv_bilateral_dd_neurons/post_opto",
+        "npas_bilateral_dd_neurons/pre_opto",
+        "npas_bilateral_dd_neurons/post_opto",
+    ]
+    is_medial = []
+
+    # Loop through paths and generate dataframe, append to dataframe list
+    path_count = 0
+    for path in paths:
+
+        # Load is_medial boolean list
+        is_medial.append(
+            np.loadtxt(f"{source_path}/{path}/is_medial.txt", delimiter=",")
+        )
+
+        # Load oscillation data
+        osc_data = np.loadtxt(f"{source_path}/{path}/osc_data.txt", delimiter=",")
+
+        # Load spike train features
+        frs = np.loadtxt(f"{source_path}/{path}/cell_frs.txt")
+        cvs = np.loadtxt(f"{source_path}/{path}/cell_cvs.txt")
+        lengths = np.loadtxt(f"{source_path}/{path}/cell_lengths.txt")
+        burst_statistics = np.loadtxt(f"{source_path}/{path}/cell_burst_statistics.txt")
+
+        # Load spike train meta data
+        mouse = open(f"{source_path}/{path}/cell_mouse.txt", "r").readlines()
+        folder = open(f"{source_path}/{path}/cell_folders.txt", "r").readlines()
+        cell_names = open(f"{source_path}/{path}/cell_names.txt", "r").readlines()
+
+        print(path_count, source_path)
+
+        # Load recording times for post-stim data
+        mouse_label = "npas_uni"
+        if path_count == 2 or path_count == 3:
+            mouse_label = "pv_bilateral"
+        if path_count == 4 or path_count == 5:
+            mouse_label = "npas_bilateral"
+
+        post_times = np.zeros(len(frs))
+        if path_count == 1:
+            post_times = np.loadtxt(
+                f"{source_path}/{'npas_uni_dd_neurons'}/post_opto/cell_post_times.txt"
+            )
+        elif path_count == 3:
+            post_times = np.loadtxt(
+                f"{source_path}/{'pv_bilateral_dd_neurons'}/post_opto/cell_post_times.txt"
+            )
+        elif path_count == 5:
+            post_times = np.loadtxt(
+                f"{source_path}/{'npas_bilateral_dd_neurons'}/post_opto/cell_post_times.txt"
+            )
+        # Construct dataframe
+        df = pd.DataFrame(
+            {
+                "FR": frs,
+                "CV": cvs,
+                # "T": lengths, # feature not used
+                # "Delta Osc": osc_data[:, 0], # feature not used
+                "Delta Power": osc_data[:, 1 if renewal_power else 2],
+                # "Beta Osc": osc_data[:, 4], # feature not used
+                "Beta Power": osc_data[:, 5 if renewal_power else 6],
+                "Num Bursts": burst_statistics[:, 0] / lengths,
+                "Avg Burst Firing Rate": burst_statistics[:, 1],
+                "Percent Time Bursting": burst_statistics[:, 2],
+                "Percent of Spikes in Bursts": burst_statistics[:, 3],
+                "Avg Burst Duration": burst_statistics[:, 4],
+                "Avg Interburst Interval": burst_statistics[:, 5],
+                # "CV Interburst Interval": burst_statistics[:, 6], # feature not used
+                # "Avg Surprise": burst_statistics[:, 7], # feature not used
+                "Non Bursting Firing Rate": burst_statistics[:, 8],
+                "Burst Firing Rate Increase": burst_statistics[:, 9],
+                "mouse": mouse_label,
+                "folder": folder,
+                "name": cell_names,
+                "Post-Time": post_times,
+                "Medial": is_medial[path_count],
+            }
+        )
+
+        # Update dataframe list and list counter
+        path_count += 1
+        dataframes.append(df)
+
+    # combine dataframes
+    df = pd.concat(dataframes, ignore_index=True)
+
+    partial_df = df.iloc[:, 0:12]
+
+    predicts = np.zeros(mlp_seeds)
+    probs = np.zeros((mlp_seeds, len(df)))
+
+    for i in range(mlp_seeds):
+        seed_train_data = pd.read_csv(
+            f"../data/neural_net/X_train_seed_{int(i):02d}.csv"
+        )
+        seed_train_data = seed_train_data.drop(
+            ["Unnamed: 0", "DD Probability", "Type"], axis=1
+        )
+        _, X_test_norm = clean_data.normalize_data(
+            seed_train_data, partial_df, min_max=False
+        )
+
+        with open(f"../data/neural_net/MLP_seed_{int(i):02d}.pkl", "rb") as file:
+            clf = pickle.load(file)
+            predict_test = clf.predict(X_test_norm)
+            predicts[i] = 1 - np.sum(predict_test) / len(X_test_norm)
+            probs[i, :] = clf.predict_proba(X_test_norm)[:, 0]
+
+    df["DD Confidence"] = np.mean(probs, axis=0)
+    df["PostCategory"] = df["Post-Time"].apply(lambda x: "0" if x == 0 else ">0")
+
+    fig, ax = plt.subplots(1, 2, figsize=(8, 4), dpi=300)
+    sns.barplot(
+        data=df,
+        x="PostCategory",  # x-axis: 0 vs >0
+        y="DD Confidence",  # y-axis: DD Confidence values
+        hue="mouse",  # separate bars for A vs B
+        errorbar="se",  # show spread; can also use "se" for standard error
+        ax=ax[0],
+    )
+    sns.lineplot(
+        data=df,
+        x="Post-Time",  # time points on x-axis
+        y="DD Confidence",  # DD confidence on y-axis
+        hue="mouse",  # separate lines for A vs B
+        errorbar="se",  # error bars (std; use "se" for standard error, None for raw lines)
+        marker="o",  # markers at each mean point
+        ax=ax[1],
+    )
+    ax[0].set_xlabel("Pre vs Post")
+    ax[0].set_xticks([0, 1])
+    ax[0].set_xticklabels(["Pre", "Post"])
+    add_fig_labels([ax[0], ax[1]])
+    makeNice([ax[0], ax[1]])
+    fig.savefig("../resub_data/dd_confidence_results.pdf", bbox_inches="tight")
+    plt.close()
+
+    fig, ax = plt.subplots(4, 3, figsize=(12, 10), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(4) for j in range(3)]
+    for i, col in enumerate(df.columns[0:12]):
+        sns.lineplot(
+            data=df,
+            x="Post-Time",  # time points on x-axis
+            y=col,  # DD confidence on y-axis
+            hue="mouse",  # separate lines for A vs B
+            errorbar="se",  # error bars (std; use "se" for standard error, None for raw lines)
+            marker="o",  # markers at each mean point
+            ax=axes[i],
+        )
+    makeNice(axes)
+    add_fig_labels(axes)
+    fig.savefig("../resub_data/features_results.pdf", bbox_inches="tight")
+    plt.close()
+
+    for i, col in enumerate(df.columns[0:12]):
+        for mouse in np.unique(df["mouse"]):
+            fig, ax = plt.subplots(1, 1, figsize=(4, 3), dpi=300, tight_layout=300)
+            bps = ax.boxplot(
+                [
+                    df[(df["mouse"] == mouse) & (df["Post-Time"] == 0)][col],
+                    df[(df["mouse"] == mouse) & (df["Post-Time"] > 0)][col],
+                ],
+                showfliers=False,
+                widths=0.75,
+                boxprops={"color": "k" if mouse == "JAWS" else "purple"},
+                whiskerprops={"color": "k" if mouse == "JAWS" else "purple"},
+                medianprops={"color": "k" if mouse == "JAWS" else "purple"},
+                capprops={"color": "k" if mouse == "JAWS" else "purple"},
+                patch_artist=True,
+            )
+            bps["boxes"][0].set(facecolor="white")
+            bps["boxes"][1].set(facecolor="gray" if mouse == "JAWS" else "mediumpurple")
+
+            ax.set_ylabel(col if col != "Num Bursts" else "Busts/s")
+            ax.set_xticks([1, 2])
+            ax.set_xticklabels(["Pre", "Post"])
+            makeNice(ax)
+            fig.savefig(f"../resub_data/boxplot_{mouse}_{col}.pdf", bbox_inches="tight")
+            plt.close()
+
+    run_cmd(f"open ../resub_data/dd_confidence_results.pdf")
+    run_cmd(f"open ../resub_data/features_results.pdf")
+
+    df.to_csv("../resub_data/resub_data_results.csv")
+
+
 # Create data and generate statistics for further analysis
 
-create_ephys_training_data(fixed_length)
+# create_ephys_training_data(fixed_length)
+
+process_resub_data()

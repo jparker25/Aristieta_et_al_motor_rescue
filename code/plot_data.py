@@ -15,6 +15,7 @@ from scipy.stats import ks_2samp
 from scipy import stats
 from matplotlib.gridspec import GridSpec
 from matplotlib import gridspec
+import sys
 
 # user modules
 from helpers import *
@@ -777,6 +778,97 @@ def plot_corr_matrix(df):
     makeNice(axes, labelsize=6)
     fig.savefig("../data/corr_matrix.pdf")
     plt.close()
+
+
+def feature_time_medial(jaws_npas_dfs, show=False):
+    fig, ax = plt.subplots(4, 3, figsize=(12, 8), dpi=300, tight_layout=True)
+    axes = [ax[i, j] for i in range(4) for j in range(3)]
+    axis_count = 0
+    print([len(x) for x in jaws_npas_dfs])
+    for col in jaws_npas_dfs[0].columns[0:12]:
+        jaws_medial_pre = jaws_npas_dfs[0][
+            (jaws_npas_dfs[0]["mouse"] == "JAWS") & (jaws_npas_dfs[0]["Medial"] == 1)
+        ][col]
+
+        jaws_non_medial_pre = jaws_npas_dfs[0][
+            (jaws_npas_dfs[0]["mouse"] == "JAWS") & (jaws_npas_dfs[0]["Medial"] == 0)
+        ][col]
+
+        npas_medial_pre = jaws_npas_dfs[0][
+            (jaws_npas_dfs[0]["mouse"] == "NPAS") & (jaws_npas_dfs[0]["Medial"] == 1)
+        ][col]
+
+        npas_non_medial_pre = jaws_npas_dfs[0][
+            (jaws_npas_dfs[0]["mouse"] == "NPAS") & (jaws_npas_dfs[0]["Medial"] == 0)
+        ][col]
+
+        jaws_medial_post = []
+        jaws_non_medial_post = []
+        npas_medial_post = []
+        npas_non_medial_post = []
+
+        for x in jaws_npas_dfs[1:]:
+            jaws_medial_post.extend(
+                x[(x["mouse"] == "JAWS") & (x["Medial"] == 1)][col].values
+            )
+            jaws_non_medial_post.extend(
+                x[(x["mouse"] == "JAWS") & (x["Medial"] == 0)][col].values
+            )
+            npas_medial_post.extend(
+                x[(x["mouse"] == "NPAS") & (x["Medial"] == 1)][col].values
+            )
+            npas_non_medial_post.extend(
+                x[(x["mouse"] == "NPAS") & (x["Medial"] == 0)][col].values
+            )
+
+        axes[axis_count].boxplot(
+            [
+                jaws_medial_pre,
+                jaws_medial_post,
+                npas_medial_pre,
+                npas_medial_post,
+                jaws_non_medial_pre,
+                jaws_non_medial_post,
+                npas_non_medial_pre,
+                npas_non_medial_post,
+            ],
+            showfliers=False,
+        )
+        axes[axis_count].set_xticks(range(8))
+        axes[axis_count].set_xticklabels(
+            [
+                "JAWS Medial Pre",
+                "JAWS Medial Post",
+                "NPAS Medial Pre",
+                "NPAS Medial Post",
+                "JAWS Non-Medial Pre",
+                "JAWS Non-Medial Post",
+                "NPAS Non-Medial Pre",
+                "NPAS Non-Medial Post",
+            ],
+            rotation=25,
+            fontsize=6,
+        )
+        axes[axis_count].set_ylabel(col)
+        """axes[axis_count].boxplot(npas_medial_pre)
+        axes[axis_count].boxplot(npas_medial_post)
+
+        axes[axis_count].boxplot(jaws_non_medial_pre)
+        axes[axis_count].boxplot(jaws_non_medial_post)
+        axes[axis_count].boxplot(npas_non_medial_pre)
+        axes[axis_count].boxplot(npas_non_medial_post)"""
+
+        if col != "Type":
+            axis_count += 1
+
+    makeNice(axes, labelsize=8)
+    fig.savefig(
+        f"../data/motor_rescue_features_over_time_medial_nonmedial.pdf",
+        bbox_inches="tight",
+    )
+    plt.close()
+    if show:
+        run_cmd("open ../data/motor_rescue_features_over_time_medial_nonmedial.pdf")
 
 
 def feature_time(

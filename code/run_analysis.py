@@ -11,12 +11,14 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import sys
+import pickle
 
 # user modules
 import run_pca
 import run_neural_net
 from helpers import *
 import plot_data
+import clean_data
 
 # Flag to change power as renewal fixed or not (Whalen et al, 2020)
 renewal_power = False  # Default False
@@ -250,10 +252,17 @@ def generate_pre_post_dataframes(
 # get cont and pulse naive dd datasets
 naive_df, dd_df, df = get_naive_dd_training_data_set()
 
+
 # get npas and jaws data sets, chunk into list of data frames pre and post
 jaws_npas_df = get_jaws_npas_data_set()
 jaws_npas_df.to_csv("/Users/johnparker/Desktop/jaws_npas_pre_post.csv")
 jaws_npas_pre_post = generate_pre_post_dataframes(jaws_npas_df)
+
+"""jaws_npas_training = jaws_npas_pre_post[0].copy()
+jaws_npas_training.insert(0, "Type", np.zeros(len(jaws_npas_training)))
+combined_df = pd.concat([df, jaws_npas_training], ignore_index=True)
+combined_df.to_csv("~/Desktop/training_data.csv")
+sys.exit()"""
 
 # combine pre data for jaws and npas to training data
 training_df = df.copy()
@@ -316,10 +325,37 @@ use_feature = {
 }
 
 
+mlp_seeds = 15
+training_df_data_probs = combined_df.copy()
+training_types = training_df_data_probs["Type"].values
+partial_df = training_df_data_probs.iloc[:, 0:12]
+probs = np.zeros((mlp_seeds, len(partial_df)))
+for i in range(mlp_seeds):
+    seed_train_data = pd.read_csv(f"../data/neural_net/X_train_seed_{int(i):02d}.csv")
+    seed_train_data = seed_train_data.drop(
+        ["Unnamed: 0", "DD Probability", "Type"], axis=1
+    )
+
+    _, X_test_norm = clean_data.normalize_data(
+        seed_train_data, partial_df, min_max=False
+    )
+
+    with open(f"../data/neural_net/MLP_seed_{int(i):02d}.pkl", "rb") as file:
+        clf = pickle.load(file)
+        predict_test = clf.predict(X_test_norm)
+        probs[i, :] = clf.predict_proba(X_test_norm)[:, 0]
+
+partial_df["DD Confidence"] = np.mean(probs, axis=0)
+partial_df["Type"] = training_types
+partial_df.to_csv("../data/training_all_data_probs.csv")
+sys.exit()
+
+
 plot_data.feature_time_medial(jaws_npas_pre_post[0:4], show=False)
 
 # Plots feature histgorams and CDFs of training data
 plot_data.plot_feature_histograms_separate(combined_df, feature_outlier_strength)
+# sys.exit()
 
 # Plots feature Box plots and prints out MWU results for pre v post comparisons
 plot_data.plot_pre_post_boxplots(jaws_npas_df, show=False)
@@ -335,7 +371,7 @@ for col in combined_df.columns:
 
 # Determine which analyses to run
 mlp = True
-pca = False
+pca = True
 feature_removal = False
 
 # Seeds (15) and train/test split (0.8)

@@ -18,6 +18,7 @@ from sklearn.metrics import accuracy_score
 import scipy.stats
 import matplotlib as mpl
 import pickle
+import sys
 
 # set plotting parameters
 mpl.rcParams["pdf.fonttype"] = 42
@@ -176,14 +177,20 @@ def predict_motor_rescue(
         with open(f"../data/neural_net/MLP_seed_{seed:02d}.pkl", "wb") as f:
             pickle.dump(clf, f)
 
-        # Save training data
-        X_train.to_csv(f"../data/neural_net/X_train_seed_{seed:02d}.csv")
-
         # Get network statistics
         predicts_train = clf.predict(X_train_norm)
         predicts_test = clf.predict(X_test_norm)
         probs_train = clf.predict_proba(X_train_norm)
         probs_test = clf.predict_proba(X_test_norm)
+
+        X_train["DD Probability"] = probs_train[:, 0]
+        X_test["DD Probability"] = probs_test[:, 0]
+        X_train["Type"] = y_train
+        X_test["Type"] = y_test
+
+        # Save training data
+        X_train.to_csv(f"../data/neural_net/X_train_seed_{seed:02d}.csv")
+        X_test.to_csv(f"../data/neural_net/X_test_seed_{seed:02d}.csv")
 
         # Update histograms
         col_count = 0
@@ -422,7 +429,7 @@ def predict_motor_rescue(
         for i in range(len(jaws_npas_pre_post_probs))
     ]
 
-    fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
+    """fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
     axes = [ax[i, j] for i in range(4) for j in range(3)]
     axis_count = 0
     for col in jaws_npas_pre_post[0].columns[0:12]:
@@ -547,10 +554,11 @@ def predict_motor_rescue(
         axis_count += 1
     makeNice(axes)
     fig.savefig(f"../data/features_vs_prob_jaws.pdf", bbox_inches="tight")
-    plt.close()
+    plt.close()"""
 
     # Save data
-    time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    # time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    time_plot = ["pre", "30", "60", "90_120"]
     for i in range(len(jaws_npas_pre_post_probs)):
         np.savetxt(
             f"../data/npas_probs_conf_all_{time_plot[i]}.csv",
@@ -563,7 +571,8 @@ def predict_motor_rescue(
             delimiter=",",
             newline="\n",
         )
-    time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    # time_plot = ["pre", "30", "60", "90_120", "150_180_210"]
+    time_plot = ["pre", "30", "60", "90_120"]
     for i in range(len(jaws_npas_pre_post_probs)):
         np.savetxt(
             f"../data/jaws_probs_conf_all_{time_plot[i]}.csv",
@@ -644,18 +653,20 @@ def predict_motor_rescue(
             )
         count += 1
     for i in [2, 3]:
-        axes[i].set_xticks(np.arange(5))
+        axes[i].set_xticks(np.arange(len(jaws_npas_pre_post)))
         axes[i].set_xticklabels(
-            ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            # ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            ["Pre", "30min", "60min", "90-120min"],
             fontsize=6,
             rotation=15,
         )
         axes[i].set_ylabel(f"{'JAWS' if i == 2 else 'NPAS'} DD Proportions")
     for i in range(2):
         axes[i].hlines(0.5, 0, 5, ls="dashed", lw=0.5, color="k")
-        axes[i].set_xticks(np.arange(0.375, 5.25, 1))
+        axes[i].set_xticks(np.arange(0.375, 4.25, 1))
         axes[i].set_xticklabels(
-            ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            # ["Pre", "30min", "60min", "90-120min", "150-210min"],
+            ["Pre", "30min", "60min", "90-120min"],
             fontsize=6,
             rotation=15,
         )
@@ -690,6 +701,112 @@ def predict_motor_rescue(
         np.mean(accuracies, axis=0),
         scipy.stats.sem(accuracies, axis=0),
     )
+
+    # medial, lateral, pre post, DD
+    jaws_medial_pre_prob = all_pre_post[
+        (all_pre_post["Post-Time"] == 0)
+        & (all_pre_post["Medial"] == 1)
+        & (all_pre_post["mouse"] == "JAWS")
+    ]["DD Probability"].values
+
+    jaws_medial_post_prob = all_pre_post[
+        (all_pre_post["Post-Time"] > 0)
+        & (all_pre_post["Medial"] == 1)
+        & (all_pre_post["mouse"] == "JAWS")
+    ]["DD Probability"].values
+
+    jaws_non_medial_pre_prob = all_pre_post[
+        (all_pre_post["Post-Time"] == 0)
+        & (all_pre_post["Medial"] == 0)
+        & (all_pre_post["mouse"] == "JAWS")
+    ]["DD Probability"].values
+
+    jaws_non_medial_post_prob = all_pre_post[
+        (all_pre_post["Post-Time"] > 0)
+        & (all_pre_post["Medial"] == 0)
+        & (all_pre_post["mouse"] == "JAWS")
+    ]["DD Probability"].values
+
+    npas_medial_pre_prob = all_pre_post[
+        (all_pre_post["Post-Time"] == 0)
+        & (all_pre_post["Medial"] == 1)
+        & (all_pre_post["mouse"] == "NPAS")
+    ]["DD Probability"].values
+
+    npas_medial_post_prob = all_pre_post[
+        (all_pre_post["Post-Time"] > 0)
+        & (all_pre_post["Medial"] == 1)
+        & (all_pre_post["mouse"] == "NPAS")
+    ]["DD Probability"].values
+
+    npas_non_medial_pre_prob = all_pre_post[
+        (all_pre_post["Post-Time"] == 0)
+        & (all_pre_post["Medial"] == 0)
+        & (all_pre_post["mouse"] == "NPAS")
+    ]["DD Probability"].values
+
+    npas_non_medial_post_prob = all_pre_post[
+        (all_pre_post["Post-Time"] > 0)
+        & (all_pre_post["Medial"] == 0)
+        & (all_pre_post["mouse"] == "NPAS")
+    ]["DD Probability"].values
+
+    fig, ax = plt.subplots(1, 2, figsize=(4, 3), dpi=300, tight_layout=True)
+    axes = [ax[i] for i in range(2)]
+    count = 0
+    dd_prob_splits = [[0, 0.50], [0.50, 0.67], [0.67, 0.83], [0.83, 1]]
+    dd_colors = ["gray", "lightblue", "b", "darkblue"]
+
+    jaws_dd_vals = [
+        jaws_medial_pre_prob,
+        jaws_medial_post_prob,
+        jaws_non_medial_pre_prob,
+        jaws_non_medial_post_prob,
+    ]
+
+    npas_dd_vals = [
+        npas_medial_pre_prob,
+        npas_medial_post_prob,
+        npas_non_medial_pre_prob,
+        npas_non_medial_post_prob,
+    ]
+
+    for k in range(len(jaws_dd_vals)):
+        jdv = jaws_dd_vals[k]
+        ndv = npas_dd_vals[k]
+        probs_jdv = np.zeros(len(x))
+        probs_ndv = np.zeros(len(x))
+        for i in range(len(dd_prob_splits)):
+            probs_jdv[i] = len(
+                jdv[(jdv >= dd_prob_splits[i][0]) & (jdv < dd_prob_splits[i][1])]
+            ) / len(jdv)
+            axes[0].bar(
+                k, probs_jdv[i], bottom=np.sum(probs_jdv[0:i]), color=dd_colors[i]
+            )
+            probs_ndv[i] = len(
+                ndv[(ndv >= dd_prob_splits[i][0]) & (ndv < dd_prob_splits[i][1])]
+            ) / len(ndv)
+            axes[1].bar(
+                k, probs_ndv[i], bottom=np.sum(probs_ndv[0:i]), color=dd_colors[i]
+            )
+
+    makeNice(axes)
+    add_fig_labels(axes)
+    axes[0].set_xticks([0, 1, 2, 3])
+    axes[0].set_xticklabels(
+        ["Pre-Medial", "Post-Medial", "Pre-Nonmedial", "Post-Nonmedial"], rotation=25
+    )
+    axes[0].set_ylabel("JAWS Proportion")
+
+    axes[1].set_xticks([0, 1, 2, 3])
+    axes[1].set_xticklabels(
+        ["Pre-Medial", "Post-Medial", "Pre-Nonmedial", "Post-Nonmedial"], rotation=25
+    )
+    axes[1].set_ylabel("NPAS Proportion")
+    fig.savefig(
+        "../data/neural_net/jaws_npas_summary_medial_nonmedial.pdf", bbox_inches="tight"
+    )
+    plt.close()
 
     # Plot histograms
     fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
@@ -827,7 +944,7 @@ def predict_motor_rescue(
 
     disp.plot(ax=axes[0], im_kw={"aspect": "auto"}, values_format=".0f")
     axes[0].set_title(
-        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f} +/- {np.std(accuracies[:,0],axis=0)}\nPrecision: {np.mean(precisions[:,1]):.02f}, {np.mean(precisions[:,0]):.02f}\nRecall: {np.mean(recalls[:,1]):.02f}, {np.mean(recalls[:,0]):.02f}",
+        f"Accuracy: {np.mean(accuracies[:,0],axis=0):.02f} +/- {np.std(accuracies[:,0],axis=0):.02f}\nPrecision: {np.mean(precisions[:,1]):.02f}, {np.mean(precisions[:,0]):.02f}\nRecall: {np.mean(recalls[:,1]):.02f}, {np.mean(recalls[:,0]):.02f}",
         fontsize=10,
     )
 
@@ -933,6 +1050,298 @@ def predict_motor_rescue(
         capsize=4,
         marker="o",
     )
+
+    jaws_post_medial = []
+    jaws_post_non_medial = []
+    npas_post_medial = []
+    npas_post_non_medial = []
+
+    jaws_pre_medial_probs = jaws_npas_pre_post_probs[0][
+        :,
+        (jaws_npas_pre_post[0]["mouse"] == "JAWS")
+        & (jaws_npas_pre_post[0]["Medial"] == 1),
+        0,
+    ]
+
+    npas_pre_medial_probs = jaws_npas_pre_post_probs[0][
+        :,
+        (jaws_npas_pre_post[0]["mouse"] == "NPAS")
+        & (jaws_npas_pre_post[0]["Medial"] == 1),
+        0,
+    ]
+
+    jaws_pre_non_medial_probs = jaws_npas_pre_post_probs[0][
+        :,
+        (jaws_npas_pre_post[0]["mouse"] == "JAWS")
+        & (jaws_npas_pre_post[0]["Medial"] == 0),
+        0,
+    ]
+
+    npas_pre_non_medial_probs = jaws_npas_pre_post_probs[0][
+        :,
+        (jaws_npas_pre_post[0]["mouse"] == "NPAS")
+        & (jaws_npas_pre_post[0]["Medial"] == 0),
+        0,
+    ]
+
+    """[
+        np.mean(
+            jaws_npas_pre_post_probs[i][
+                :,
+                (jaws_npas_pre_post[i]["mouse"] == "JAWS")
+                & (jaws_npas_pre_post[i]["Medial"] == 1),
+                0,
+            ],
+            axis=1,
+        )
+        for i in range(len(jaws_npas_pre_post))
+    ],
+    """
+
+    jaws_pre_medial_probs = []
+    jaws_pre_non_medial_probs = []
+    npas_pre_medial_probs = []
+    npas_pre_non_medial_probs = []
+
+    jaws_post_medial_probs = []
+    jaws_post_non_medial_probs = []
+    npas_post_medial_probs = []
+    npas_post_non_medial_probs = []
+
+    for i in range(len(seeds)):
+        jaws_pre_medial_probs.extend(
+            jaws_npas_pre_post_probs[0][
+                i,
+                (jaws_npas_pre_post[0]["mouse"] == "JAWS")
+                & (jaws_npas_pre_post[0]["Medial"] == 1),
+                0,
+            ]
+        )
+        jaws_pre_non_medial_probs.extend(
+            jaws_npas_pre_post_probs[0][
+                i,
+                (jaws_npas_pre_post[0]["mouse"] == "JAWS")
+                & (jaws_npas_pre_post[0]["Medial"] == 0),
+                0,
+            ]
+        )
+        npas_pre_medial_probs.extend(
+            jaws_npas_pre_post_probs[0][
+                i,
+                (jaws_npas_pre_post[0]["mouse"] == "NPAS")
+                & (jaws_npas_pre_post[0]["Medial"] == 1),
+                0,
+            ]
+        )
+        npas_pre_non_medial_probs.extend(
+            jaws_npas_pre_post_probs[0][
+                i,
+                (jaws_npas_pre_post[0]["mouse"] == "NPAS")
+                & (jaws_npas_pre_post[0]["Medial"] == 0),
+                0,
+            ]
+        )
+
+        for j in range(1, len(jaws_npas_pre_post)):
+            jaws_post_medial_probs.extend(
+                jaws_npas_pre_post_probs[j][
+                    i,
+                    (jaws_npas_pre_post[j]["mouse"] == "JAWS")
+                    & (jaws_npas_pre_post[j]["Medial"] == 1),
+                    0,
+                ]
+            )
+            jaws_post_non_medial_probs.extend(
+                jaws_npas_pre_post_probs[j][
+                    i,
+                    (jaws_npas_pre_post[j]["mouse"] == "JAWS")
+                    & (jaws_npas_pre_post[j]["Medial"] == 0),
+                    0,
+                ]
+            )
+            npas_post_medial_probs.extend(
+                jaws_npas_pre_post_probs[j][
+                    i,
+                    (jaws_npas_pre_post[j]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[j]["Medial"] == 1),
+                    0,
+                ]
+            )
+            npas_post_non_medial_probs.extend(
+                jaws_npas_pre_post_probs[j][
+                    i,
+                    (jaws_npas_pre_post[j]["mouse"] == "NPAS")
+                    & (jaws_npas_pre_post[j]["Medial"] == 0),
+                    0,
+                ]
+            )
+
+    for i in range(1, len(jaws_npas_pre_post)):
+        jaws_post_medial.extend(jaws_npas_pre_post_predicts_medial[i][:, 0])
+        jaws_post_non_medial.extend(jaws_npas_pre_post_predicts_non_medial[i][:, 0])
+        npas_post_medial.extend(jaws_npas_pre_post_predicts_medial[i][:, 2])
+        npas_post_non_medial.extend(jaws_npas_pre_post_predicts_non_medial[i][:, 2])
+
+    figX, axX = plt.subplots(1, 2, figsize=(6, 3), dpi=300, tight_layout=True)
+    axX[0].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_npas_pre_post_predicts_medial[0][:, 0]),
+            np.mean(jaws_post_medial),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[0][:, 0]),
+            scipy.stats.sem(jaws_post_medial),
+        ],
+        color="r",
+        ls="dashed",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Jaws medial",
+    )
+    axX[0].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_npas_pre_post_predicts_medial[0][:, 2]),
+            np.mean(npas_post_medial),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_medial[0][:, 2]),
+            scipy.stats.sem(npas_post_medial),
+        ],
+        color="b",
+        ls="dashed",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Npas medial",
+    )
+
+    axX[0].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_npas_pre_post_predicts_non_medial[0][:, 2]),
+            np.mean(jaws_post_non_medial),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[0][:, 2]),
+            scipy.stats.sem(jaws_post_non_medial),
+        ],
+        color="r",
+        ls="dotted",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Jaws non-medial",
+    )
+    axX[0].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_npas_pre_post_predicts_non_medial[0][:, 0]),
+            np.mean(npas_post_non_medial),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_npas_pre_post_predicts_non_medial[0][:, 0]),
+            scipy.stats.sem(npas_post_non_medial),
+        ],
+        color="b",
+        ls="dotted",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Npas non-medial",
+    )
+
+    axX[1].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_pre_medial_probs),
+            np.mean(jaws_post_medial_probs),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_pre_medial_probs),
+            scipy.stats.sem(jaws_post_medial_probs),
+        ],
+        color="r",
+        ls="dashed",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Jaws medial",
+    )
+
+    axX[1].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(jaws_pre_non_medial_probs),
+            np.mean(jaws_post_non_medial_probs),
+        ],
+        yerr=[
+            scipy.stats.sem(jaws_pre_non_medial_probs),
+            scipy.stats.sem(jaws_post_non_medial_probs),
+        ],
+        color="r",
+        ls="dotted",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Jaws medial",
+    )
+
+    axX[1].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(npas_pre_medial_probs),
+            np.mean(npas_post_medial_probs),
+        ],
+        yerr=[
+            scipy.stats.sem(npas_pre_medial_probs),
+            scipy.stats.sem(npas_post_medial_probs),
+        ],
+        color="b",
+        ls="dashed",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Npas medial",
+    )
+
+    axX[1].errorbar(
+        x=[0, 1],
+        y=[
+            np.mean(npas_pre_non_medial_probs),
+            np.mean(npas_post_non_medial_probs),
+        ],
+        yerr=[
+            scipy.stats.sem(npas_pre_non_medial_probs),
+            scipy.stats.sem(npas_post_non_medial_probs),
+        ],
+        color="b",
+        ls="dotted",
+        capsize=3,
+        markersize=5,
+        marker="o",
+        label="Npas non-medial",
+    )
+
+    axX[0].set_xticks([0, 1])
+    axX[0].set_xticklabels(["Pre", "Post"])
+    axX[0].legend(ncols=2, frameon=False, fancybox=False, fontsize=6)
+    axX[0].set_ylabel("Predicted DD%")
+
+    axX[1].set_xticks([0, 1])
+    axX[1].set_xticklabels(["Pre", "Post"])
+    axX[1].set_ylabel("DD Confidence")
+
+    makeNice([axX[0], axX[1]], labelsize=6)
+    add_fig_labels([axX[0], axX[1]])
+    figX.savefig(
+        f"../data/neural_net/pre_post_medial_nonmedial.pdf",
+        transparent=True,
+        bbox_inches="tight",
+    )
+    plt.close()
 
     # Plot predicted DD percentages for medial units
     axes[3].errorbar(
@@ -1262,12 +1671,12 @@ def predict_motor_rescue(
                     30,
                     60,
                     "90-120",
-                    "150-210",
+                    # "150-210",
                     f"Npas-Pre",
                     30,
                     60,
                     "90-120",
-                    "150-210",
+                    # "150-210",
                 ]
             )
         else:
@@ -1278,7 +1687,7 @@ def predict_motor_rescue(
                     30,
                     60,
                     "90-120",
-                    "150-210",
+                    # "150-210",
                 ]
             )
     [axes[i].grid(lw=0.1, alpha=0.5) for i in range(2, len(axes))]

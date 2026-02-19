@@ -17,7 +17,7 @@ delta_srch_lo = 0.5; delta_srch_hi = 4; delta_force_freq = 2;
 freqs = 0:FS/wind:50; % for most purposes only care about this range
 freqs_long = 0:FS/wind:FS/2-FS/wind; % full range
 
-direcs = ["npas_uni_dd_neurons/pre_opto","pv_bilateral_dd_neurons/pre_opto","npas_uni_dd_neurons/post_opto","pv_bilateral_dd_neurons/post_opto"];
+direcs = ["npas_uni_dd_neurons/pre_opto","pv_bilateral_dd_neurons/pre_opto","npas_bilateral_dd_neurons/pre_opto","npas_uni_dd_neurons/post_opto","pv_bilateral_dd_neurons/post_opto","npas_bilateral_dd_neurons/post_opto"];
 
 for direc = 1:length(direcs)
     spike_files = dir(fullfile(sprintf('../resub_data/%s/spikes/*.txt',direcs(direc))));
