@@ -24,8 +24,8 @@ def read_in_npas_uni_DD():
     """
 
     # Set directories
-    direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/Data_for_resubmission/Npas_cre_UniDD"
-    save_direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_unidd_pre_processed"
+    direc = "../mlp_data/SNr_motor_rescue_project/Data_for_resubmission/Npas_cre_UniDD"
+    save_direc = "../mlp_data/SNr_motor_rescue_project/npas_cre_unidd_pre_processed"
 
     # Create save directory
     run_cmd(f"mkdir -p {save_direc}")
@@ -346,8 +346,8 @@ def read_in_npas_bilateral_DD():
     """
 
     # Set directories
-    direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/Data_for_resubmission/Npas_cre_BilateralDD"
-    save_direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_bidd_pre_processed"
+    direc = "../mlp_data/SNr_motor_rescue_project/Data_for_resubmission/Npas_cre_BilateralDD"
+    save_direc = "../mlp_data/SNr_motor_rescue_project/npas_cre_bidd_pre_processed"
 
     # Create save directory
     run_cmd(f"mkdir -p {save_direc}")
@@ -670,8 +670,10 @@ def read_in_pv_bilateral_dd():
     """
 
     # Set directories
-    direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/Data_for_resubmission/SNr-PV_bilateral_DD"
-    save_direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/pv_bilateral_dd_pre_processed"
+    direc = (
+        "../mlp_data/SNr_motor_rescue_project/Data_for_resubmission/SNr-PV_bilateral_DD"
+    )
+    save_direc = "../mlp_data/SNr_motor_rescue_project/pv_bilateral_dd_pre_processed"
 
     # Create save directory
     run_cmd(f"mkdir -p {save_direc}")

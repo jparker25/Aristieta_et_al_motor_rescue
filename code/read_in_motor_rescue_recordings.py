@@ -23,9 +23,9 @@ def read_in_jaws():
     """
 
     # Set directories
-    direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/hsyn-Jaws_in_SNr_6-OHDA_mouse"
+    direc = "../mlp_data/SNr_motor_rescue_project/hsyn-Jaws_in_SNr_6-OHDA_mouse"
     save_direc = (
-        "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
+        "../mlp_data/SNr_motor_rescue_project/jaws_pre_processed"
     )
 
     # Create save directory
@@ -311,9 +311,9 @@ def read_in_npas():
     """
 
     # Set directories
-    direc = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/Npas-cre_mouse_DIO-ChR2_in_SNr_6-OHDA"
+    direc = "../mlp_data/SNr_motor_rescue_project/Npas-cre_mouse_DIO-ChR2_in_SNr_6-OHDA"
     save_direc = (
-        "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_pre_processed"
+        "../mlp_data/SNr_motor_rescue_project/npas_pre_processed"
     )
 
     # Create save directory
