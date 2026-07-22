@@ -1,0 +1,2 @@
+../mlp_data/mlp_training/DD_data.csv filter=lfs diff=lfs merge=lfs -text
+../mlp_data/mlp_training/naive_data.csv filter=lfs diff=lfs merge=lfs -text
