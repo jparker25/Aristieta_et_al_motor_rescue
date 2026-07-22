@@ -16,34 +16,30 @@ from helpers import *
 #### GLOBAL VARIABLES ####
 
 # Paths to pre-processed data
-jaws_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
-npas_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_pre_processed"
+jaws_path = "../mlp_data/mlp_training/SNr_motor_rescue_project/jaws_pre_processed"
+npas_path = "../mlp_data/mlp_training/SNr_motor_rescue_project/npas_pre_processed"
 cont_gpe_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/gpe_pv_hsyn/pre_processed_data"
+    "../mlp_data/mlp_training/continuous_light/gpe_pv_hsyn/pre_processed_data"
 )
-cont_d1_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/d1_msns/pre_processed_data"
-)
+cont_d1_data = "../mlp_data/mlp_training/continuous_light/d1_msns/pre_processed_data"
 
 pulse_gpe_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
 )
 pulse_d1_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
 )
 
 dd_cont_gpe_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/gpe_pv_hsyn/pre_processed_data"
+    "../mlp_data/mlp_training/continuous_light/gpe_pv_hsyn/pre_processed_data"
 )
-dd_cont_d1_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/d1_msns/pre_processed_data"
-)
+dd_cont_d1_data = "../mlp_data/mlp_training/continuous_light/d1_msns/pre_processed_data"
 
 dd_pulse_gpe_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
 )
 dd_pulse_d1_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
 )
 
 # length of spike trains to analyze
@@ -761,6 +757,5 @@ def create_pulse_cont_training_data(fixed_length):
 
 
 # Create data and generate statistics for further analysis
-
-# create_ephys_training_data(training_fixed_length)
-# create_pulse_cont_training_data(training_fixed_length)
+create_ephys_training_data(training_fixed_length)
+create_pulse_cont_training_data(training_fixed_length)
