@@ -3,34 +3,30 @@ import os, sys, json
 import pandas as pd
 
 # Paths to pre-processed data
-jaws_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/jaws_pre_processed"
-npas_path = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_pre_processed"
+jaws_path = "../mlp_data/mlp_training/SNr_motor_rescue_project/jaws_pre_processed"
+npas_path = "../mlp_data/mlp_training/SNr_motor_rescue_project/npas_pre_processed"
 cont_gpe_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/gpe_pv_hsyn/pre_processed_data"
+    "../mlp_data/mlp_training/continuous_light/gpe_pv_hsyn/pre_processed_data"
 )
-cont_d1_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/d1_msns/pre_processed_data"
-)
+cont_d1_data = "../mlp_data/mlp_training/continuous_light/d1_msns/pre_processed_data"
 
 pulse_gpe_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
 )
 pulse_d1_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
 )
 
 dd_cont_gpe_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/gpe_pv_hsyn/pre_processed_data"
+    "../mlp_data/mlp_training/continuous_light/gpe_pv_hsyn/pre_processed_data"
 )
-dd_cont_d1_data = (
-    "/Users/johnparker/UPitt_Data/continuous_light/d1_msns/pre_processed_data"
-)
+dd_cont_d1_data = "../mlp_data/mlp_training/continuous_light/d1_msns/pre_processed_data"
 
 dd_pulse_gpe_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/gpe_pv/pre_processed_data"
 )
 dd_pulse_d1_data = (
-    "/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
+    "../mlp_data/mlp_training/pulsed_light_terminal_20Hz/d1_msns/pre_processed_data"
 )
 
 
@@ -147,7 +143,7 @@ dd_training_paths = [
     dd_pulse_gpe_data,
 ]
 
-dd_data_set_to_csv(dd_training_paths, "/Users/johnparker/Desktop")
+dd_data_set_to_csv(dd_training_paths, "../mlp_data/mlp_training")
 
 naive_training_paths = [
     cont_d1_data,
@@ -156,9 +152,9 @@ naive_training_paths = [
     pulse_gpe_data,
 ]
 
-naive_data_set_to_csv(naive_training_paths, "/Users/johnparker/Desktop")
+naive_data_set_to_csv(naive_training_paths, "../mlp_data/mlp_training")
 
 jaws_npas_training_paths = [jaws_path, npas_path]
 
 
-jaws_npas_data_set_to_csv(jaws_npas_training_paths, "/Users/johnparker/Desktop")
+jaws_npas_data_set_to_csv(jaws_npas_training_paths, "../mlp_data/mlp_training")
