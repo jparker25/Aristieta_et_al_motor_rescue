@@ -377,9 +377,6 @@ def plot_features_probabilities(naive_df, dd_df):
         "Burst Firing Rate Increase",
     ]
 
-    # fig, ax = plt.subplots(4, 3, figsize=(8, 6), dpi=300, tight_layout=True)
-    # axes = [ax[i, j] for i in range(4) for j in range(3)]
-
     fig = plt.figure(figsize=(12, 12))
     gs = GridSpec(4, 3, figure=fig, hspace=0.35)
     gs_axes = [gs[i, j] for i in range(4) for j in range(3)]
@@ -850,14 +847,6 @@ def feature_time_medial(jaws_npas_dfs, show=False):
             fontsize=6,
         )
         axes[axis_count].set_ylabel(col)
-        """axes[axis_count].boxplot(npas_medial_pre)
-        axes[axis_count].boxplot(npas_medial_post)
-
-        axes[axis_count].boxplot(jaws_non_medial_pre)
-        axes[axis_count].boxplot(jaws_non_medial_post)
-        axes[axis_count].boxplot(npas_non_medial_pre)
-        axes[axis_count].boxplot(npas_non_medial_post)"""
-
         if col != "Type":
             axis_count += 1
 
