@@ -1,0 +1,9 @@
+Mouse#:	1
+Recording:	012722
+distance:	1.1
+trajectory:	3
+mouse:	6-OHDA
+cell_num:	22
+channel:	Ch4
+pos:	right
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/raw_data/6-OHDA/AA012722/01-27-22_PV-cre#1_trajectory3_1.1mm_right_rec16_1mW_10s_SNr_pulsed/Ch4.txt

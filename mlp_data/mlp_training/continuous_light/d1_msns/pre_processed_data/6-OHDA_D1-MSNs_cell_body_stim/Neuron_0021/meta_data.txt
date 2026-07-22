@@ -1,0 +1,10 @@
+AG:	AG8106
+Mouse#:	7
+Recording:	06-30-22
+distance:	1.7
+trajectory:	6
+mouse:	6-OHDA
+cell_num:	21
+channel:	16
+pos:	left
+src:	raw_data/D1-MSN_DIO-ChR2_rec_SNr/6-OHDA/D1-MSNs cell body stim/AG8106_mouse#7_recorded_06-30-22/Trajectory6_1.7mm_left_rec13_1mW_10s_STR_cells_recorded_together/Ch16.txt

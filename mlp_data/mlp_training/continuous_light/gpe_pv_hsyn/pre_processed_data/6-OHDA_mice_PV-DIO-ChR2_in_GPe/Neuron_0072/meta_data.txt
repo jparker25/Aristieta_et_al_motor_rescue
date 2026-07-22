@@ -1,0 +1,10 @@
+AG:	AG6926
+Mouse#:	1
+Recording:	050621
+distance:	1.7
+trajectory:	2
+mouse:	6-OHDA mice
+cell_num:	72
+channel:	2
+pos:	right
+src:	raw_data/Spike times files GPe to SNr project/6-OHDA mice/PV-DIO-ChR2 in GPe/AG6926_mouse#1_6-OHDA_recorded_050621/Trajectory2_1.7mm_right_in_SNr_1mW_10s_GPe_stim_neurons_recorded_together/Neuron_recorded_in_Ch2.txt

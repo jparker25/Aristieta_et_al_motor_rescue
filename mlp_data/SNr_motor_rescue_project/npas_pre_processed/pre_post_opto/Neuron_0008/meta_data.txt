@@ -1,0 +1,1 @@
+{"mouse": "SNr_neurons_recorded_during_opto-stim", "folder": "Npas-cre#3_AG9551_12-03-23_Trajectory5_900microns_caudal_+_1.25mm_lateral_rec14_spont_act_90min_post", "cell_name": "CHANNEL 5", "type": "npas", "medial": true}

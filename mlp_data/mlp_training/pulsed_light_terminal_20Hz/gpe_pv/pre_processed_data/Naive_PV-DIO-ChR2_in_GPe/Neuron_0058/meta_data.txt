@@ -1,0 +1,9 @@
+Mouse#:	1
+Recording:	081321
+distance:	1.7
+trajectory:	3
+mouse:	Naive
+cell_num:	58
+channel:	Ch8
+pos:	right
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/raw_data/Naive/AA081321/AG7094_AA081321_PV-cre#1_trajectory3_1.7mm_right_rec14_neurons_recorded_together/Ch8.txt

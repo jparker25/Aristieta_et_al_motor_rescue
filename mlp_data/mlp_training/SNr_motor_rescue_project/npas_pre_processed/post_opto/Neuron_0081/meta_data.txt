@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA112023", "folder": "Npas-cre#5_AG9467_11-20-23_Trajectory6_500microns_caudal_+_1.4mm_lateral_deeper_rec18_spont_act_150min_post", "cell_name": "SPK_SPKC13a (artefact)", "type": "npas", "post_time": 150, "medial": false}

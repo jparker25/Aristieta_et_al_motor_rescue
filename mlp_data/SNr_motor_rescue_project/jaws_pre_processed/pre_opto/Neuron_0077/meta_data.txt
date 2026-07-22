@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA011124", "folder": "D1-cre-Vglut2-cre#1_AG9530_1-11-24_Trajectory3_250microns_caudal_+_1.25mm_right_deeper_rec7_spont_act", "cell_name": "SPK_SPKC01a", "type": "jaws", "medial": true}

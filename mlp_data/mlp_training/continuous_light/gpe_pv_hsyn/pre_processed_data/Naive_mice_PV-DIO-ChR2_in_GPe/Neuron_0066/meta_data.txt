@@ -1,0 +1,10 @@
+AG:	AG7094
+Mouse#:	3
+Recording:	081921
+distance:	1.4
+trajectory:	1
+mouse:	Naive mice
+cell_num:	66
+channel:	16
+pos:	right
+src:	raw_data/Spike times files GPe to SNr project/Naive mice/PV-DIO-ChR2 in GPe/AG7094_mouse#3_Naive_recorded_081921/Trajectory1_1.4mm_right_rec1_1mW_10s_GPe_neurons_recorded_together/Ch16.txt

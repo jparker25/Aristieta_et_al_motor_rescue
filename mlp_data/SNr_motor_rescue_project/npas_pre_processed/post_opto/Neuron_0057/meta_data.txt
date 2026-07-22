@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA120623", "folder": "Mouse#2_AG9553_12-06-23_Trajectory5_400microns_caudal_+_1.65mm_lateral_rec14_spont_act_150min_post", "cell_name": "SPK_SPKC14a (no opto-tagging)", "type": "npas", "post_time": 150, "medial": false}

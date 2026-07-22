@@ -1,0 +1,10 @@
+AG:	AG8017
+Mouse#:	4
+Recording:	070722
+distance:	1.1
+trajectory:	6
+mouse:	Naive
+cell_num:	31
+channel:	7
+pos:	left
+src:	raw_data/D1-MSN_DIO-ChR2_rec_SNr/Naive/D1-MSNs cell body stim/Mouse#4_recorded_070722_AG8017/Trajectory6_1.1mm_left_rec17_1mW_10s_STR_neurons_recorded_together/Ch7.txt

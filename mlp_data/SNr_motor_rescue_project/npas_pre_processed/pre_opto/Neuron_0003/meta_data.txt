@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA120423", "folder": "Npas-cre#1_AG9551_12-04-23_Trajectory3_400microns_caudal_+_1.25mm_lateral_rec9_spont_act", "cell_name": "SPK_SPKC13a (no response)", "type": "npas", "medial": true}

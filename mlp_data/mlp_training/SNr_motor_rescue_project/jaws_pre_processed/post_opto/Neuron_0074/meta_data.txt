@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA121623", "folder": "Npas-cre#6_AG9467_12-16-23_Trajectory6_650microns_caudal_+_1.25mm_lateral_deeper_rec22_spont_act_150min_post_opto-stim", "cell_name": "SPK_SPKC12c", "type": "jaws", "post_time": 150, "medial": true}

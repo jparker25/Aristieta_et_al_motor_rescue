@@ -1,0 +1,10 @@
+AG:	AG7499
+Mouse#:	1
+Recording:	011322
+distance:	1.4
+trajectory:	4
+mouse:	Naive
+cell_num:	120
+channel:	15
+pos:	left
+src:	raw_data/D1-MSN_DIO-ChR2_rec_SNr/Naive/D1-MSNs cell body stim/Mouse#1_recorded_011322_AG7499/011322_D1-cre#1_trajectory4_1.4mm_left_+500more_caudal_1mW_STR_10s_cont_stim_neurons_recorded_together/Neuron_recorded_in_Ch15.txt

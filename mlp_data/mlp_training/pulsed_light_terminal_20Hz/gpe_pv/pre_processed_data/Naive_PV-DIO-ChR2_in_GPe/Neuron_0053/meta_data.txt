@@ -1,0 +1,9 @@
+Mouse#:	5
+Recording:	022422
+distance:	1.7
+trajectory:	2
+mouse:	Naive
+cell_num:	53
+channel:	Ch7
+pos:	right
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/raw_data/Naive/AA022422/022422_PV-cre#5_trajectory2_1.7mm_right_rec9_1mW_10s_GPe_term_pulsed/Ch7.txt

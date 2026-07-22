@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA021124", "folder": "Lhx6-flp_AG9678#5_02-11-24_Trajectory6_1.25mm_right_+_700microns_caudal_rec20_spont_act_180min_post_opto-stim", "cell_name": "SPK_SPKC04a", "type": "jaws", "post_time": 180, "medial": true}

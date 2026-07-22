@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA120623", "folder": "Mouse#2_AG9553_12-06-23_Trajectory3_600microns_caudal_+_1.2mm_lateral_rec9_30-60min_post", "cell_name": "SPK_SPKC02a", "type": "npas", "post_time": 30, "medial": true}

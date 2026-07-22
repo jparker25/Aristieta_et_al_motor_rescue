@@ -1,0 +1,10 @@
+AG:	AG6145
+Mouse#:	1
+Recording:	101520
+distance:	1.0
+trajectory:	3
+mouse:	Naive mice
+cell_num:	40
+channel:	10
+pos:	right
+src:	raw_data/Spike times files GPe to SNr project/Naive mice/hsyn-ChR2 in GPe/AG6145_mouse#1_Naive_recorded_101520/Trajectory3_1.0mm_right_in_SNr_1mW_10s_GPe_stim_neurons_recorded_together/Neuron_recorded_in_Ch10.txt

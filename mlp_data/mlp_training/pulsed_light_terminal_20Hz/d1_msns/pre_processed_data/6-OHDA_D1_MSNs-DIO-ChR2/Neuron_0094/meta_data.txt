@@ -1,0 +1,9 @@
+Mouse#:	5
+Recording:	021722
+distance:	1.4
+trajectory:	4
+mouse:	6-OHDA
+cell_num:	94
+channel:	Ch2
+pos:	left
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/raw_data/6-OHDA/AA021722/021722_D1-cre#5_trajectory4_1.4mm_left_rec20_1mW_10s_SNr_20Hz_pulsed/Ch2.txt

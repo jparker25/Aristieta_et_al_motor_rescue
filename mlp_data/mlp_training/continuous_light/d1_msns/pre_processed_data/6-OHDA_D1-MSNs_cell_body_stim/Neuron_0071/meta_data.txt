@@ -1,0 +1,10 @@
+AG:	AG8020
+Mouse#:	4
+Recording:	06-23-22
+distance:	1.1
+trajectory:	3
+mouse:	6-OHDA
+cell_num:	71
+channel:	7
+pos:	right
+src:	raw_data/D1-MSN_DIO-ChR2_rec_SNr/6-OHDA/D1-MSNs cell body stim/AG8020_mouse#4_recorded_06-23-22/Trajectory3_1.1mm_right_rec5_1mW_10s_STR_cells_recorded_together/Ch7.txt

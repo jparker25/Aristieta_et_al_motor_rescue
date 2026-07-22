@@ -1,0 +1,9 @@
+Mouse#:	1
+Recording:	062122
+distance:	1.7
+trajectory:	2
+mouse:	Naive
+cell_num:	27
+channel:	Ch15
+pos:	right
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/d1_msns/raw_data/Naive/AA062122/06-21-22_D1-cre#1_trajectory2_1.7mm_right_rec7_1mW_10s_STR_term_pulses/Ch15.txt

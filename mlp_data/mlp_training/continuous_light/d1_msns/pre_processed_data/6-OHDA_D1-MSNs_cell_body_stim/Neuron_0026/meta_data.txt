@@ -1,0 +1,10 @@
+AG:	AG7499
+Mouse#:	4
+Recording:	02-15-22
+distance:	1.4
+trajectory:	1
+mouse:	6-OHDA
+cell_num:	26
+channel:	11
+pos:	right
+src:	raw_data/D1-MSN_DIO-ChR2_rec_SNr/6-OHDA/D1-MSNs cell body stim/AG7499_mouse#4_recorded_02-15-22/Trajectory1_1.4mm_right_rec1_1mW_10s_STR_neurons_recorded_together/Ch11.txt

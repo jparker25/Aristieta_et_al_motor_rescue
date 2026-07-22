@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA020924", "folder": "Vglut2-cre#4_AG9687_02-09-24_Trajectory4_1.65mm_right_+_700microns_caudal_rec11_opto-stim_10x30", "cell_name": "SPK_SPKC01a", "type": "jaws", "post_time": 30, "medial": false}

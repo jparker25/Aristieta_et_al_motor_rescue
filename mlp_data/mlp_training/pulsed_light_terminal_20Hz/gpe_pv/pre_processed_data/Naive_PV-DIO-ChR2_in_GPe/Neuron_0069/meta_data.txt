@@ -1,0 +1,9 @@
+Mouse#:	3
+Recording:	081921
+distance:	1.7
+trajectory:	2
+mouse:	Naive
+cell_num:	69
+channel:	Ch12
+pos:	right
+src:	/Users/johnparker/UPitt_Data/pulsed_light_terminal_20Hz/gpe_pv/raw_data/Naive/AA081921/081921_PV-cre#3_trajectory2_1.7mm_right_rec6_1mW_10s_GPe_pulsed_terminals/Ch12.txt

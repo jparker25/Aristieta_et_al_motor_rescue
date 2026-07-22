@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA121623", "folder": "Npas-cre#6_AG9467_12-16-23_Trajectory4_650microns_caudal_+_1.45mm_lateral_rec12_opto-prot_10x30", "cell_name": "SPK_SPKC11a", "type": "jaws", "medial": false}

@@ -1,0 +1,10 @@
+AG:	AG7518
+Mouse#:	4
+Recording:	022222
+distance:	1.1
+trajectory:	6
+mouse:	6-OHDA mice
+cell_num:	132
+channel:	2
+pos:	left
+src:	raw_data/Spike times files GPe to SNr project/6-OHDA mice/PV-DIO-ChR2 in GPe/AG7518_mouse#4_6-OHDA_recorded_022222/Trajectory6_1.1mm_left_rec31_1mW_10s_GPe_cont_neurons_recorded_together/Ch2.txt

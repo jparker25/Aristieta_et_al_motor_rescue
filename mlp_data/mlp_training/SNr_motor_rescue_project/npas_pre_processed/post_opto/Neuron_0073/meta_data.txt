@@ -1,0 +1,1 @@
+{"mouse": "Mouse_AA100223", "folder": "Npas-cre#1_AG9468_10-02-23_trajectory4_1.1mm_right_+200caudal_rec9_opto-stim_10x30", "cell_name": "SPK_SPKC05a", "type": "npas", "post_time": 30, "medial": true}
