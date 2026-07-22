@@ -1,0 +1,1 @@
+{"mouse": "AA103025", "folder": "Mouse#4_AG399_10-30-25_Trajectory2_1.65mm_lateral_rec5_spont_act", "cell_name": "SPK_SPKC10a (weak inhibition)", "type": "npas_uni_dd", "medial": false}

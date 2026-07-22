@@ -1,0 +1,1 @@
+{"mouse": "AA103025", "folder": "Mouse#4_AG399_10-30-25_Trajectory3_1.2mm_lateral_rec10_spont_act_30min_post", "cell_name": "SPK_SPKC02b (weak excitation)", "type": "npas_uni_dd", "post_time": 30, "medial": true}

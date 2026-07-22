@@ -1,0 +1,1 @@
+{"mouse": "AA110325", "folder": "Mouse#5_AG10847_11-03-25_Trajectory4_600microns_caudal_1.2mm_lateral_rec11_opto-stim_10x30", "cell_name": "SPK_SPKC15a (inhibited)", "type": "npas_uni_dd", "medial": true}

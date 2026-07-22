@@ -1,0 +1,1 @@
+{"mouse": "AA052825", "folder": "Npas-cre_AG38827_05-28-25_trajectory7_400microns_more_caudal_+1.45mm_lateral_rec22_180min_post", "cell_name": "SPK_SPKC09a", "type": "npas_uni_dd", "post_time": 180, "medial": false}

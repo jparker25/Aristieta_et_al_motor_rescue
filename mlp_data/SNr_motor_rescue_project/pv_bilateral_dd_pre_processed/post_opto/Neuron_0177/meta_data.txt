@@ -1,0 +1,1 @@
+{"mouse": "AA052625", "folder": "PV-cre1_AG10621_05-26-25_trajectory3_400microns_caudal_+1.6mm_lateral_rec10_30min_post", "cell_name": "SPK_SPKC07a", "type": "pv_bilateral_dd", "post_time": 30, "medial": false}

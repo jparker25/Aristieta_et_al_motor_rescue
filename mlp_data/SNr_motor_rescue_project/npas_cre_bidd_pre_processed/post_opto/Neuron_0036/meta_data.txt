@@ -1,0 +1,1 @@
+{"mouse": "AA110225", "folder": "AG10706_Mouse_Npas1_11-02-25_Trajectory11_0microns_caudal_1.6mm_lateral_rec24_spont_act_210min_post", "cell_name": "SPK_SPKC06a (NA)", "type": "npas_uni_dd", "post_time": 210, "medial": false}

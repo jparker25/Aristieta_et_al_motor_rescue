@@ -1,0 +1,1 @@
+{"mouse": "AA110125", "folder": "Mouse#5_AG10710_11-01-25_Trajectory2_400microns_caudal_1.2mm_lateral_rec3_opto-stim_10x30", "cell_name": "SPK_SPKC01a (late excitation)", "type": "npas_bi_dd", "medial": true}

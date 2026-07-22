@@ -1,0 +1,1 @@
+{"mouse": "AA110325", "folder": "Mouse#5_AG10847_11-03-25_Trajectory6_600microns_caudal_1.6mm_lateral_rec20_spont_act_90min_post", "cell_name": "SPK_SPKC14a (weak inhibition)", "type": "npas_uni_dd", "post_time": 90, "medial": false}
