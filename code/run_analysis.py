@@ -327,7 +327,7 @@ use_feature = {
 
 ### This section saves all training data to a CSV.
 ### set to True to save csv
-save_training_data_csv = False
+save_training_data_csv = True
 if save_training_data_csv:
     mlp_seeds = 15
     training_df_data_probs = combined_df.copy()
@@ -377,8 +377,8 @@ for col in combined_df.columns:
 
 # Determine which analyses to run
 mlp = True
-pca = False
-feature_removal = False
+pca = True
+feature_removal = True
 
 # Seeds (15) and train/test split (0.8)
 num_seeds = 15
