@@ -23,12 +23,12 @@ import clean_data
 
 # Paths to pre-processed data
 npas_unilateral = (
-    "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_unidd_pre_processed"
+    "../mlp_data/SNr_motor_rescue_project/npas_cre_unidd_pre_processed"
 )
-pv_bilateral = "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/pv_bilateral_dd_pre_processed"
+pv_bilateral = "../mlp_data/SNr_motor_rescue_project/pv_bilateral_dd_pre_processed"
 
 npas_bilateral = (
-    "/Users/johnparker/UPitt_Data/SNr_motor_rescue_project/npas_cre_bidd_pre_processed"
+    "../mlp_data/SNr_motor_rescue_project/npas_cre_bidd_pre_processed"
 )
 
 # length of spike trains to analyze
