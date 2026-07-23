@@ -377,14 +377,10 @@ def get_unilateral_data(renewal_power=False, mlp_seeds=15):
     run_cmd(f"open ../data/unilateral/summary_features.pdf")
 
 
-save_path = "/Users/johnparker/paper_repos/Aristieta_Parker_Rubin_Gittis_2024_motor_rescue/data/unilateral"
-raw_path = "/Users/johnparker/paper_repos/Aristieta_Parker_Rubin_Gittis_2024_motor_rescue/data/unilateral/Uni_DD_SNr_recordings"
-spike_path = "/Users/johnparker/paper_repos/Aristieta_Parker_Rubin_Gittis_2024_motor_rescue/data/unilateral/spike_trains"
+save_path = "../data/unilateral"
+raw_path = "../data/unilateral/Uni_DD_SNr_recordings"
+spike_path = "../data/unilateral/spike_trains"
 spikes = gather_unilateral_data(raw_path)
-print(len(spikes))
-sys.exit()
 
-
-# process_data(spikes, 30, spike_path)
-
-# get_unilateral_data()
+process_data(spikes, 30, spike_path)
+get_unilateral_data()
